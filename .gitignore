@@ -1,0 +1,7 @@
+#ignore apple file
+.DS_Store
+
+#ignore folders
+\papers
+\docs_feina
+
