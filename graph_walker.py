@@ -211,7 +211,7 @@ plt.show()
 for node in graph.nodes:
 # first neighbors of each node that have not been considered yet (avoid 12 21 
 # repetitions)
-    first_n = [n for n in graph.neighbors(node) if n>node]
+    first_n = [n for n in (list(graph.successors(node))+list(graph.predecessors)) if n>node]
     dist = {(node, n):np.linalg.norm(graph.nodes[n]['pos']-graph.nodes[node]['pos'])
             for n in first_n}
     nx.set_edge_attributes(graph, dist, name = 'dist')
@@ -223,49 +223,112 @@ a_dists = np.array([graph[i[0]][i[1]]['dist'] for i in graph.edges(a)])
 print(graph.edges(a))
 print(np.where(a_dists/2< 0.3))
 print(graph.nodes[a]['pos'])
-#%%
-'''now we will put a random walker in all nodes and make them walk during Dt time'''
+#%% NODE_WALKERS (walk during Dt)
+'''Function that puts n = len(list(G.nodes)) random walkers in a Digraph 
+transitable in both directions and moves them during Dt time. The walkers always 
+move until they are not able to go anywhere else with the time left'''
 
-'''G must have pos as node attributes and dist as edge attr. '''
+'''G: nx.DiGraph
+   Dt: Maximum moving time
+   v: velocity of the walkers
+   pos: dictionary with positions of each node in the DiGraph {node:(posx,pos_y)}
+   n_walk: number of realisations of the random walk during Dt max time'''
 
-def node_walkers(G, Dt, v):   
-    path = []
-    #let's add a list of 1 random walker in each node
-    ini_nodes = G.nodes
-    path.append(ini_nodes)
-    #ini_nodes = np.array(G.nodes)
-    initial_nodes = np.copy(ini_nodes)
-    #path stores the position of each walker in each time step
-    # upper bound for steps
-    max_steps  = int(v*Dt/min(nx.get_edge_attributes(G, 'dist').values()))
-    #now, let's move the walker to a connected node
-    #first let's see the available nodes to go to
-    time = np.zeros(np.shape(ini_nodes))
-    final_nodes = np.copy(ini_nodes)
-    for step in range(max_steps):
-        #list of neighboring nodes of each walker
-        neighbors = [[n for n in G.neighbors(walker)] for walker in initial_nodes]
-        #now move the random walker to another node if time is not > Dt
-        #if the added time exceeds the max time, we choose a final node randomly
-        #between the ones that follow the condition
-        print(step)
-        for node, goto_nodes in enumerate(neighbors):
-            #dist of each possible edge for a given node
-            goto_dists = np.array([G[j[0]][j[1]]['dist'] for j in G.edges(initial_nodes[node])])
-            if np.any(time[node]+goto_dists/v <= Dt):
-                possible_nodes = [goto_nodes[k] for k in 
-                                  list(np.where(time[node]+goto_dists/v <= Dt)[0])]
-                sel = random.choice(possible_nodes)
-                final_nodes[node] = sel 
-        time = [t+graph[final_nodes[i]][initial_nodes[i]]['dist']/v if
-                final_nodes[i] != initial_nodes[i] else t for i, t in enumerate(time)]
-        path.append(np.copy(final_nodes))
-        initial_nodes = final_nodes
-# returns two list of points where every list has the form: [(ix,iy), ...] and 
-# [(fx,fy), ...]
-    ini_pos = [list(G.nodes[i]['pos']) for i in ini_nodes]
-    final_pos = [list(G.nodes[f]['pos']) for f in final_nodes]
-    return ini_pos, final_pos, path
+def node_walkers(G, Dt, v, pos, n_walk):   
+    # calculating the time of each edge
+    delta_t = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
+            for edge in G.edges}
+    nx.set_edge_attributes(G, delta_t, name = 'dt')
+    #overall_node/edge_weights account for all the edge/node passings summed for 
+    #n_walk iterations
+    overall_node_weights= {node:0 for node in list(G.nodes)}
+    overall_edge_weights = {edge: 0 for edge in list(G.edges)}
+    for i in range(0, n_walk):
+        print('realisation '+str(i+1)+'/'+str(n_walk))
+        path = []
+        initial_nodes = sorted(list(G.nodes))
+        #path stores the position of each walker in each time step
+        path.append(initial_nodes)
+        #weights/edge_weights counts the amount of times a walker has visited 
+        #each node/edge in 1 realisation 
+        weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
+        edge_weights = {i_edge:0 for i_edge in list(G.edges)}
+    
+        # upper bound for steps
+        min_edge_time = min(nx.get_edge_attributes(G, 'dt').values())
+        max_steps  = int(Dt/min_edge_time)
+        print('maximum steps allowed each realisation', max_steps)
+        #first let's difine the time used for each walker
+        time = np.zeros(len(initial_nodes))
+        last_time = np.copy(time)#just for checking
+        final_nodes = np.copy(np.array(initial_nodes))#will store the position 
+        #of the walkers after 1 step
+        # 1 step moves (or tries to move according to time left) all the walkers
+        #through a neighboring edge
+        for step in range(max_steps):
+            #list of neighboring nodes of each walker
+            neighbors = [[n for n in (list(G.successors(walker))+
+                                      list(G.predecessors(walker)))] for walker
+                         in initial_nodes]
+#            print(neighbors)
+            #now randomly move the random walker to another node only if time+edge_time
+            #is < Dt
+            ind = 0
+            #checks how many walkers have nowhere left to go
+            ended_walkers = 0
+            # print(step)
+            for node, goto_nodes in zip(initial_nodes,neighbors):
+                #time of each possible edge for a given node
+
+                goto_dt = np.array([G[node][n]['dt'] if (node,n) in list(G.edges)
+                                       else G[n][node]['dt'] for n in 
+                                       goto_nodes])
+                if np.any(time[ind]+goto_dt <= Dt):
+                    possible_nodes = [goto_nodes[k] for k in 
+                                      list(np.where(time[ind]+goto_dt <= Dt)[0])]
+                    sel = random.choice(possible_nodes)
+                    final_nodes[ind] = sel 
+                else:
+                    # print(time[ind])
+                    ended_walkers += 1
+                ind += 1        
+            time = [t+G[initial_nodes[j]][final_nodes[j]]['dt'] if
+                    (initial_nodes[j], final_nodes[j]) in list(G.edges) else 
+                    t+G[final_nodes[j]][initial_nodes[j]]['dt'] if 
+                    (final_nodes[j],initial_nodes[j]) in list(G.edges) else t 
+                    for j, t in enumerate(time)]
+            # print(time)
+            path.append(np.copy(final_nodes))
+            #counting edge visits according to direction of edge         
+            for node_i, node_f in zip(initial_nodes, final_nodes):
+                if node_i != node_f:
+                    if (node_i, node_f) in list(G.edges):
+                        edge_weights[(node_i,node_f)] += 1
+                    elif (node_f, node_i) in list(G.edges):
+                        edge_weights[(node_f,node_i)] -= 1
+                    else:
+                        print('ini different than final but edge not in graph')
+            #count the occutpation of each node after the moves
+            for node_i, node_f in zip(initial_nodes, final_nodes):
+                if node_i != node_f:
+                    weights[node_i] += 1
+                
+            initial_nodes = np.copy(final_nodes)
+            if ended_walkers == len(initial_nodes):
+                print((np.array(time) == last_time).all())
+                print('all walkers finished, steps needed for this realisation '
+                      +str(step)+'/'+str(max_steps))
+                break
+            last_time = np.copy(np.array(time))
+        for edge in G.edges:
+            overall_edge_weights[edge] += edge_weights[edge]
+        for node in G.nodes:
+            overall_node_weights[node] += weights[node]
+        #set node value as the number of visits of each value
+        # print(weights)
+    nx.set_node_attributes(G, overall_node_weights, name='weights')
+    nx.set_edge_attributes(G, overall_edge_weights, name = 'edge_visits')
+    return(G)
 
 #%%
 min_dist = min(nx.get_edge_attributes(graph, 'dist').values())
@@ -301,7 +364,7 @@ plt.quiver(x, y, u, v, angles='xy', scale_units='xy', scale=1.)
            # np.array(path1)[len(path1)-1,1], angles='xy', scale_units='xy', scale=1)
 
 
-#%% WALKERS ON A DIRECTED GRAPH
+#%% WALKERS ON A DIRECTED GRAPH (walk during amount of steps)
 
 '''
 moves "n_walk" walkers/node in a directed graph "G" "steps" times. The initial positions of the
@@ -313,46 +376,51 @@ to the nodes
 
 def digraph_walkers(G, steps, n_walk):    
             
-    path = []
     #let's add a list of n_walk random walkers
-    initial_nodes = list(G.nodes)
-    for i in range(1, n_walk):
-        print(i)
-        initial_nodes += initial_nodes
-    #path stores the position of each walker in each time step
-    path.append(initial_nodes)
-    #weights counts the amount of times a walker has visited each node 
-    weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
-    edge_weights = {i_edge:0 for i_edge in list(G.edges)}
-    #now, let's move the walker to a connected node
-    #first let's see the available nodes to go to
-    for step in range(steps):
-        #list of neighboring nodes (successors) of each walker
-        neighbors = [[n for n in (list(G.neighbors(walker))+
-                                  list(G.predecessors(walker)))] 
-                     for walker in initial_nodes]
-        #now move the random walker to another node
-        final_nodes = [random.choice(goto_nodes) for goto_nodes in neighbors]
-        
-        path.append(final_nodes)   
-        
-        #counting edge visits according to direction of edge         
-        for node_i, node_f in zip(initial_nodes, final_nodes):
-            if node_i != node_f:
-                if (node_i, node_f) in list(G.edges):
-                    edge_weights[(node_i,node_f)] += 1
-                else:
-                    edge_weights[(node_f,node_i)] -= 1
-        #count the occutpation of each node after the moves
-        for node_i, node_f in zip(initial_nodes, final_nodes):
-            if node_i != node_f:
-                weights[node_i] += 1
+    overall_node_weights= {node:0 for node in list(G.nodes)}
+    overall_edge_weights = {edge: 0 for edge in list(G.edges)}
+    for i in range(0, n_walk):
+        path = []
+        initial_nodes = list(G.nodes)
+        # initial_nodes += initial_nodes
+        #path stores the position of each walker in each time step
+        path.append(initial_nodes)
+        #weights counts the amount of times a walker has visited each node 
+        weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
+        edge_weights = {i_edge:0 for i_edge in list(G.edges)}
+        #now, let's move the walker to a connected node
+        #first let's see the available nodes to go to
+        for step in range(steps):
+            #list of neighboring nodes (successors) of each walker
+            neighbors = [[n for n in (list(G.neighbors(walker))+
+                                      list(G.predecessors(walker)))] 
+                         for walker in initial_nodes]
+            #now move the random walker to another node
+            final_nodes = [random.choice(goto_nodes) for goto_nodes in neighbors]
             
-        initial_nodes = final_nodes
-    #set node value as the number of visits of each value
-    # print(weights)
-    nx.set_node_attributes(G, weights, name='weights')
-    nx.set_edge_attributes(G, edge_weights, name = 'edge_visits')
+            path.append(final_nodes)   
+            
+            #counting edge visits according to direction of edge         
+            for node_i, node_f in zip(initial_nodes, final_nodes):
+                if node_i != node_f:
+                    if (node_i, node_f) in list(G.edges):
+                        edge_weights[(node_i,node_f)] += 1
+                    else:
+                        edge_weights[(node_f,node_i)] -= 1
+            #count the occutpation of each node after the moves
+            for node_i, node_f in zip(initial_nodes, final_nodes):
+                if node_i != node_f:
+                    weights[node_i] += 1
+                
+            initial_nodes = final_nodes
+        for edge in G.edges:
+            overall_edge_weights[edge] += edge_weights[edge]
+        for node in G.nodes:
+            overall_node_weights[node] += weights[node]
+        #set node value as the number of visits of each value
+        # print(weights)
+    nx.set_node_attributes(G, overall_node_weights, name='weights')
+    nx.set_edge_attributes(G, overall_edge_weights, name = 'edge_visits')
     return(G)
 
 #%% 
@@ -415,7 +483,7 @@ plt.colorbar(sm)
 plt.show()
 
 
-#%%
+#%%Original triangle finder function
 from itertools import combinations, permutations
 def countTriangle(G, isDirected):
     
@@ -468,7 +536,44 @@ def countTriangle(G, isDirected):
     else:
         print('Error: Graph is not directed')
 
+#%% ALTERNATIVE WAY TO FND TRIANGLES (fasster)
 
+import networkx as nx
+from itertools import combinations, permutations
+def find_triangles(G):
+    """
+    Returns a list of all triangles in the graph G.
+    """
+    triangles = {}
+    count_Triangle = 0
+    for node in G.nodes():
+        # Get the neighbors of the node
+        neighbors = set(list(G.neighbors(node)) +list(G.predecessors(node)))
+        for neighbor in neighbors:
+            # Get the common neighbors of the node and its neighbor
+            common_neighbors = neighbors.intersection(set(list(G.neighbors(neighbor)) 
+                                                          +list(G.predecessors(neighbor))))
+            for common_neighbor in common_neighbors:
+                # Add the triangle to the list
+                if node < neighbor and neighbor < common_neighbor:
+                    x = [node, neighbor, common_neighbor]
+                    if (node, neighbor) in G.edges:
+                        edge_1 = [node, neighbor]
+                    else:
+                        edge_1 = [neighbor, node]
+                    if (node, common_neighbor) in G.edges:
+                        edge_2 = [node, common_neighbor]
+                    else:
+                        edge_2 = [common_neighbor, node]
+                        
+                    if (neighbor, common_neighbor) in G.edges:
+                        edge_3 = [neighbor, common_neighbor]
+                    else:
+                        edge_3 = [common_neighbor, neighbor]
+                        
+                    triangles[tuple(x)] = [edge_1, edge_2, edge_3]
+                    count_Triangle+= 1
+    return count_Triangle, triangles
 #%% HODGE DECOMPOSITION FUNCTION
 from sympy import LeviCivita
 import scipy
@@ -503,14 +608,9 @@ def hodge_decomposition(G, attr_name):
         grad_arr.append(row)
         row = []
     grad_arr = np.array(grad_arr)
-    
+    print('gradient op\n',grad_arr)
 #LAPLACIAN MATRIX  
     lap = np.transpose(grad_arr).dot(grad_arr)
-    # finding the minimum of the divergence ---> 0 of potential
-    # min_div = min(list(div.values()))
-    # remove_index = list(div.values()).index(min_div)
-    # print('node index with zero potential', remove_index)
-    # lap = np.delete(lap, remove_index, axis = 1)   
     # print('checking solvability',np.linalg.cond(lap))
     #OBTAINING THE GRADIENT COMPONENT
     # compute the pseudo inverse of the laplacian to solve the syst of equations
@@ -518,7 +618,7 @@ def hodge_decomposition(G, attr_name):
     Apinv = np.linalg.pinv(lap)
     # apply the pseudo-inverse to the rhs vector to obtain the `solution'
     div_arr = np.transpose(np.array(list(div.values())))
-    # print('laplacian and divergence', lap, div_arr)  
+    #print('divergence\n',div_arr)
     
     pot_field = np.squeeze(np.asarray(Apinv.dot(-div_arr)))
     print('error in node potentials', lap.dot(pot_field)+div_arr)
@@ -526,14 +626,12 @@ def hodge_decomposition(G, attr_name):
     # pot_field.insert(remove_index, 0)
     pot_nodes = {n:pot for n, pot in enumerate(pot_field)}
     # print('node potentials', pot_nodes)
-    # for edge in G.edges():
-    #     grad_comp[edge] = pot_nodes[edge[1]]-pot_nodes[edge[0]]
     grad_comp_arr = np.transpose(grad_arr.dot(pot_field))
     grad_comp = {edge:grad_comp_arr[i] for i, edge in enumerate(G.edges)}
 # SOLENOIDAL COMPONENT
 #Calculating the edge-2 matrix or oriented-face incidence matrix which
 #corresponds to the curl operator
-    n_tri, tri_dict = countTriangle(G, True)
+    n_tri, tri_dict = find_triangles(G)
     print(tri_dict)
     print('number of triangles', n_tri)
     if n_tri != 0:
@@ -582,12 +680,13 @@ def hodge_decomposition(G, attr_name):
         #     rot_arr.append(row)
         # rot_arr = np.array(rot_arr)
         curl_op = np.array(curl_op)
-
         # print(rot_arr)
         rot_arr_inv = np.linalg.pinv(curl_op.dot(np.transpose(curl_op))).dot(curl_op)
+
 #        print(curl_op)
         #computing the curl of the graph
         rot = curl_op.dot(g_field)
+        print('big rot arr\n',curl_op.dot(np.transpose(curl_op)))
         # print('curl_op',curl_op)
         # print('field',g_field)
         # print('solvability of curl comp', np.linalg.cond(rot_arr))
@@ -600,8 +699,8 @@ def hodge_decomposition(G, attr_name):
               curl_op.dot(np.transpose(curl_op)).dot(tri_pot)-rot)
         #solenoidal component is delta1* (transpose of curl op) of the potential:
         g_s = np.transpose(curl_op).dot(tri_pot)
-        print('curl of graph vs curl of solenoidal component', 
-              rot, curl_op.dot(g_s))
+        print('curl of graph', 
+              rot)
         sol_comp = {}
         for edge, comp in zip(G.edges, g_s):
             sol_comp[edge] = comp
@@ -639,20 +738,20 @@ def hodge_decomposition(G, attr_name):
         har_comp = {}
         for edge, har in zip(G.edges, g_har_vec):
             har_comp[edge] = har
-    return grad_comp, sol_comp, har_comp
-#%%
+    return grad_comp, sol_comp, har_comp, pot_nodes
+#%% CUSTOM GRAPH
 
 g = nx.DiGraph()
 
 ### SQUARE
-g.add_nodes_from([0, 1, 2, 3])
-g.add_edges_from([(0,1), (1,2), (2,3), (3,0)])
-attr = {(0,1): 2, (1,2): 2, (2,3): 2, (3,0):-2}
+# g.add_nodes_from([0, 1, 2, 3])
+# g.add_edges_from([(0,1), (1,2), (2,3), (3,0)])
+# attr = {(0,1): 2, (1,2): 2, (2,3): 2, (3,0):-2}
 
 ### 2 triangles
-# g.add_nodes_from([0, 1, 2, 3])
-# g.add_edges_from([(0,1), (2,0), (1,2), (3,1), (2,3)])
-# attr = {(0,1): 0.5,(2,0): 0.5, (1,2): 2, (3,1): 1, (2,3):1}
+g.add_nodes_from([0, 1, 2, 3, 4])
+g.add_edges_from([(0,1), (2,0), (1,2), (1,3), (2,3), (3,4), (0,4)])
+attr = {(0,1): 3,(2,0): 3, (1,2): 2, (1,3): 1, (2,3):1, (3,4): -2, (0,4):1}
 ### line
 # g.add_nodes_from([0, 1, 2, 3])
 # g.add_edges_from([(0,1), (1,2), (2,3)])
@@ -661,55 +760,79 @@ attr = {(0,1): 2, (1,2): 2, (2,3): 2, (3,0):-2}
 
 
 nx.set_edge_attributes(g,attr,name = 'edge_visits')
-grad_comp, sol_comp, har_comp = hodge_decomposition(g, 'edge_visits')
+grad_comp, sol_comp, har_comp, div = hodge_decomposition(g, 'edge_visits')
 grad_comp = {comp:round(grad_comp[comp],4) for comp in grad_comp.keys()}
 sol_comp = {comp:round(sol_comp[comp], 4) for comp in sol_comp.keys()}
 har_comp = {comp:round(har_comp[comp], 4) for comp in har_comp.keys()}
 #pos = EoN.hierarchy_pos(G, 0, width = 1)
 #g = tree_w
-pos = nx.spring_layout(g, k = 0.7)
+pos = nx.planar_layout(g)
+# pos = nx.spring_layout(g, k = 0.7)
 #pos = {0: (0,0), 1: (1,0), 2: (1,1), 3: (0,1)}
+
+nx.draw_networkx(g, pos = pos, with_labels=True, node_size = 250, font_size =15,
+                 node_color = '#AED0EE')
+nx.draw_networkx_edge_labels(g ,pos = pos, edge_labels = attr, 
+                             rotate = False, font_size = 15)
+plt.axis('off')
+#%%
+
 plt.subplots(2,2, figsize = (10,10))
 plt.subplot(221)
 plt.title('original')
-nx.draw_networkx(g, pos = pos, with_labels=False, node_size = 10)
+nx.draw_networkx(g, pos = pos, with_labels=True, node_size = 250, font_size =15,
+                 node_color = '#AED0EE')
 nx.draw_networkx_edge_labels(g ,pos = pos, edge_labels = attr, 
-                             rotate = False, font_size = 8)
+                             rotate = False, font_size = 15)
 
 plt.subplot(222)
 plt.title('gradient')
-nx.draw_networkx(g, pos = pos, with_labels=False, node_size = 10)
+nx.draw_networkx(g, pos = pos, with_labels=True, node_size = 250, font_size =15,
+                 node_color = '#AED0EE')
 nx.draw_networkx_edge_labels(g ,pos = pos, edge_labels = grad_comp, 
-                             rotate = False, font_size = 8)
+                             rotate = False, font_size = 15)
 
 plt.subplot(223)
 plt.title('solenoidal')
-nx.draw_networkx(g,pos = pos, with_labels=False, node_size = 10)
+nx.draw_networkx(g,pos = pos, with_labels=True, node_size = 250, font_size =15,
+                 node_color = '#AED0EE')
 nx.draw_networkx_edge_labels(g ,pos, edge_labels = sol_comp, 
-                             rotate = False, font_size = 8)
+                             rotate = False, font_size = 15)
 
 plt.subplot(224)
 plt.title('harmonic')
-nx.draw_networkx(g,pos = pos, with_labels=False, node_size = 10)
+nx.draw_networkx(g,pos = pos, with_labels=True, node_size = 250, font_size =15,
+                 node_color = '#AED0EE')
 nx.draw_networkx_edge_labels(g ,pos = pos, edge_labels = har_comp, 
-                             rotate = False, font_size = 8)
+                             rotate = False, font_size = 15)
 plt.tight_layout()
 
-#%%
+#%% WHEEL
 
-''' CIRCULAR GRAPH'''
+''' CIRCULAR GRAPH: 3 concentric wheels'''
 #number of nodes
-n_nodes = 20
+n_nodes = 60
 #wheel graph
-wheel = nx.circular_ladder_graph(n_nodes)
+#wheel = nx.circular_ladder_graph(n_nodes)
 #position of the nodes
+wheel = nx.Graph()
+wheel.add_nodes_from(list(range(n_nodes)))
+wheel.add_edges_from([(i,i+1) if i<=(n_nodes/3-2) else (0,i) for i in range(int(n_nodes/3))])
+wheel.add_edges_from([(i,i+1) if i<=(2*n_nodes/3-2) else (n_nodes/3,i) for i 
+                      in range(int(n_nodes/3), 2*int(n_nodes/3))])
+wheel.add_edges_from([(i,i+1) if i<=(n_nodes-2) else (int(2*n_nodes/3),i) for i in 
+                      range(2*int(n_nodes/3),int(n_nodes))])
+wheel.add_edges_from([(i,i+20) for i in range(int(2*n_nodes/3))])
 R = 1
 R2 = 1.5
-dalph = 2*np.pi/(n_nodes)
+R3 = 2
+dalph = 2*np.pi/(n_nodes/3)
+
 pos_c= {}
-for i in range(int(len(list(wheel.nodes()))/2)):
+for i in range(int(n_nodes/3)):
     pos_c[i] = (R*np.cos(dalph*i),R*np.sin(dalph*i))
-    pos_c[i+len(list(wheel.nodes()))/2] = (R2*np.cos(dalph*i),R2*np.sin(dalph*i))
+    pos_c[i+n_nodes/3] = (R2*np.cos(dalph*i),R2*np.sin(dalph*i))
+    pos_c[i+2*n_nodes/3] = (R3*np.cos(dalph*i),R3*np.sin(dalph*i))
 #nx.draw_networkx(wheel, with_labels = True, pos = pos_c)
 
 #transforming the wheel graph into a digraph and removing ill posing edges
@@ -717,9 +840,14 @@ wheel_d = nx.DiGraph(wheel)
 out_edges = [edge for edge in wheel_d.edges if edge[0]>edge[1]]#removing all outward edges
 wheel_d.remove_edges_from(out_edges)
 
+plt.figure(figsize = (8,8))
+nx.draw_networkx(wheel_d,pos = pos_c, with_labels=True)
+
 steps = 10
 n_walk = 1
-walk_wh = digraph_walkers(wheel_d, steps, n_walk)
+
+walk_wh = node_walkers(wheel_d,100, 0.04,pos_c)
+#walk_wh = digraph_walkers(wheel_d, steps, n_walk)
 
 plt.figure(figsize = (8,8))
 nx.draw_networkx(walk_wh,pos = pos_c, with_labels=True)
@@ -729,7 +857,7 @@ nx.draw_networkx_edge_labels(walk_wh ,pos = pos_c, edge_labels =
 plt.tight_layout()
 plt.show()
 
-grad_wh, sol_wh, har_wh = hodge_decomposition(walk_wh, 'edge_visits')
+grad_wh, sol_wh, har_wh, div_wh = hodge_decomposition(walk_wh, 'edge_visits')
 
 
 grad_wh = {comp:round(grad_wh[comp],2) for comp in grad_wh.keys()}
@@ -764,7 +892,7 @@ nx.draw_networkx_edge_labels(wheel_d ,pos = pos_c, edge_labels = har_wh,
 plt.tight_layout()
 plt.show()
 
-#%%
+#%% 2 CLUSTER DELAUNAY
 '''Delaunay'''
 
 '''
@@ -773,10 +901,10 @@ we will create 2 clusters of points normally distributed
 from scipy.spatial import Delaunay
 #x,y coords of points
 np.random.seed(1000)
-nodes_cl1 = 4
-nodes_cl2 = 4
-clust_1 = np.random.normal(0, 1, size = (nodes_cl1,2))
-clust_2 = np.random.normal(5, 1, size = (nodes_cl2,2))
+nodes_cl1 = 2
+nodes_cl2 = 2
+# clust_1 = np.random.normal(0, 1, size = (nodes_cl1,2))
+# clust_2 = np.random.normal(5, 1, size = (nodes_cl2,2))
 
 # clust_1 = np.array([[0,0], [0,1], [1,0]])
 # clust_2 = clust_1+2
@@ -816,7 +944,7 @@ ini_del = nx.Graph(list(edges))
 
 #dictionary of node:position
 pointIDXY = dict(zip(range(len(clusters)), clusters))
-nx.set_node_attributes(graph, pointIDXY, name = 'pos')
+nx.set_node_attributes(ini_del, pointIDXY, name = 'pos')
 #nx.draw(graph, pointIDXY)
 #plt.show()
 
@@ -830,14 +958,14 @@ del_dg.remove_edges_from(out_edges)
 #     if (edge[1],edge[0]) not in del_dg.edges:
 #         del_dg.add_edge(edge[1],edge[0])
 nx.draw_networkx(del_dg, pos = pointIDXY, with_labels = True)   
-steps = 10
+Dt = 10
+v = 1
 n_walk = 1
-walk_del = digraph_walkers(del_dg, steps, n_walk)
+walk_del = node_walkers(del_dg, Dt,v,pointIDXY,n_walk)
 
-print(walk_del.edges)
 
 #%%
-grad_del, sol_del, har_del = hodge_decomposition(walk_del, 'edge_visits')
+grad_del, sol_del, har_del, div_del = hodge_decomposition(walk_del, 'edge_visits')
 
 pos_c = pointIDXY
 
@@ -886,15 +1014,17 @@ plt.show()
 #%% FRUCHT GRAPH TO SEE HARMONIC SOLENOIDAL AND GRADIENT COMPONENTS AT THE SAME TIME
 
 #frucht graph
-frucht = nx.frucht_graph(nx.DiGraph())
+frucht = nx.frucht_graph()
 #position of the nodes
 
 #transforming the frucht graph into a digraph 
 frucht_d = nx.DiGraph(frucht)
+out_edges = [edge for edge in frucht_d.edges if edge[1]>edge[0]]#removing problematic edges
+frucht_d.remove_edges_from(out_edges)
 
 pos_c = nx.planar_layout(frucht_d)
 steps = 10
-n_walk = 1
+n_walk = 100
 walk_fr = digraph_walkers(frucht_d, steps, n_walk)
 
 plt.figure(figsize = (8,8))
@@ -905,7 +1035,7 @@ nx.draw_networkx_edge_labels(walk_fr ,pos = pos_c, edge_labels =
 plt.tight_layout()
 plt.show()
 
-grad_fr, sol_fr, har_fr = hodge_decomposition(walk_fr, 'edge_visits')
+grad_fr, sol_fr, har_fr, div = hodge_decomposition(walk_fr, 'edge_visits')
 
 
 grad_fr = {comp:round(grad_fr[comp],2) for comp in grad_fr.keys()}
@@ -962,3 +1092,186 @@ plt.colorbar(sm)
 
 plt.tight_layout()
 plt.show()
+#%% CIRCULATING DELAUNAYS
+
+'''CIRCULATING DELAUNAYS'''
+
+
+'''
+we will create 4 clusters of points normally distributed
+'''
+from scipy.spatial import Delaunay
+#x,y coords of points
+np.random.seed(1000)
+nodes_cl = 100
+clust_1 = np.random.normal((2,0), 0.6, size = (nodes_cl,2))
+clust_2 = np.random.normal((-2,0), 0.6, size = (nodes_cl,2))
+clust_3 = np.random.normal((0,-2), 0.6, size = (nodes_cl,2))
+clust_4 = np.random.normal((0,2), 0.6, size = (nodes_cl,2))
+
+
+clusters = np.concatenate((clust_1,clust_2, clust_3,clust_4), axis = 0)
+tri = Delaunay(clusters)
+plt.figure()
+plt.triplot(clusters[:,0], clusters[:,1], tri.simplices)
+plt.plot(clust_1[:,0], clust_1[:,1], 'or', label = 'cluster 1')
+plt.plot(clust_2[:,0], clust_2[:,1], 'ob', label = 'cluster 2')
+plt.plot(clust_3[:,0], clust_3[:,1], 'og', label = 'cluster 3')
+plt.plot(clust_4[:,0], clust_4[:,1], 'oy', label = 'cluster 4')
+plt.legend()
+plt.show()
+
+# create a set for edges that are indexes of the points
+edges = set()
+# for each Delaunay triangle
+for n in range(tri.nsimplex):
+    # for each edge of the triangle
+    # sort the vertices
+    # (sorting avoids duplicated edges being added to the set)
+    # and add to the edges set
+    edge = sorted([tri.vertices[n,0], tri.vertices[n,1]])
+    edges.add((edge[0], edge[1]))
+    edge = sorted([tri.vertices[n,0], tri.vertices[n,2]])
+    edges.add((edge[0], edge[1]))
+    edge = sorted([tri.vertices[n,1], tri.vertices[n,2]])
+    edges.add((edge[0], edge[1]))
+
+
+# make a graph based on the Delaunay triangulation edges
+ini_del = nx.Graph(list(edges))
+#plt.figure()
+# plot graph
+
+#dictionary of node:position
+pointIDXY = dict(zip(range(len(clusters)), clusters))
+nx.set_node_attributes(ini_del, pointIDXY, name = 'pos')
+#nx.draw(graph, pointIDXY)
+#plt.show()
+
+
+### DELAUNAY
+del_dg = nx.DiGraph(ini_del)
+
+out_edges = [edge for edge in del_dg.edges if edge[1]>edge[0]]#removing problematic edges
+del_dg.remove_edges_from(out_edges)
+
+remove = []
+for edge in del_dg.edges:
+    pos_1 = pointIDXY[edge[0]]
+    pos_2 = pointIDXY[edge[1]]
+    vec = pos_2-pos_1
+    if (pos_1 in clust_1 and pos_2 in clust_1) or (pos_1 in clust_2 and pos_2 
+    in clust_2):
+        if abs(vec[0])/abs(vec[1])>1.3:
+            remove.append(edge)
+    elif (pos_1 in clust_3 and pos_2 in clust_3) or (pos_1 in clust_4 and pos_2
+    in clust_4):
+        if abs(vec[0])/abs(vec[1])<0.7:
+            remove.append(edge)
+    elif (pos_1 in clust_1 and pos_2 in clust_2) or (pos_1 in clust_3 and pos_2 
+    in clust_4) or (pos_1 in clust_2 and pos_2 in clust_1) or (pos_1 in clust_4
+                                                               and pos_2 
+                                                               in clust_3):
+        remove.append(edge)
+del_dg.remove_edges_from(remove)
+plt.figure()
+nx.draw_networkx(del_dg, pos = pointIDXY, with_labels = False, node_size = 10)   
+# for node in del_dg.nodes: 
+#     print(node, 'neighbours',list(del_dg.predecessors(node))+list(del_dg.successors(node)))
+#     if len(list(del_dg.predecessors(node))+list(del_dg.successors(node))) == 0:
+#         print('no neigbours')
+Dt = 100
+v = 0.1
+n_walk = 20
+walk_del = node_walkers(del_dg, Dt,v,pointIDXY,n_walk)
+
+
+#%%
+grad_del, sol_del, har_del, div_del = hodge_decomposition(walk_del, 'edge_visits')
+#%%
+pos_c = pointIDXY
+
+
+grad_del = {comp:round(grad_del[comp],2) for comp in grad_del.keys()}
+sol_del = {comp:round(sol_del[comp], 2) for comp in sol_del.keys()}
+har_del = {comp:round(har_del[comp], 2) for comp in har_del.keys()}
+
+edge_del = nx.get_edge_attributes(walk_del, 'edge_visits')
+
+
+plt.subplots(2,2, figsize = (10,15))
+plt.subplot(221)
+plt.title('original')
+
+color_p = list(div_del.values())
+colors = range(int(min(color_p)),int(max(color_p)))
+cmap=plt.cm.seismic
+vmin = min(colors)
+vmax = max(colors)
+
+
+nx.draw_networkx(walk_del, pos = pos_c, with_labels=False, node_color=color_p,
+                 cmap=cmap, vmin=vmin, vmax=vmax, node_size = 10)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+plt.colorbar(sm)
+
+
+plt.subplot(222)
+color_g = np.abs(np.array(list(grad_del.values())))
+#plotting edges with color gradient
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+plt.title('gradient')
+nx.draw_networkx(walk_del, pos = pos_c, with_labels=False, node_size = 10,
+                 edge_color=color_g, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+plt.colorbar(sm)
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_s = np.abs(np.array(list(sol_del.values())))
+plt.subplot(223)
+plt.title('solenoidal')
+nx.draw_networkx(walk_del,pos = pos_c, with_labels=False, node_size = 10,
+                 edge_color=color_s, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+plt.colorbar(sm)
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_h = np.abs(np.array(list(har_del.values())))
+plt.subplot(224)
+plt.title('harmonic')
+nx.draw_networkx(walk_del,pos = pos_c, with_labels=False, node_size = 10,
+                 edge_color=color_h, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+plt.colorbar(sm)
+plt.tight_layout()
+plt.show()
+#%%
+import math
+plt.figure()
+plt.hist(list(div_del.values()),bins = 50, density = True)
+mean = sum(list(div_del.values()))/len(list(div_del.values()))
+std = np.std(np.array(list(div_del.values())))
+x = np.linspace(-60, 20, 100)
+def gauss(x, mu, std):
+    return(np.exp(-0.5*((x-mu)/std)**2)/(std*np.sqrt(2*np.pi)))
+plt.plot(x, gauss(x, mean, std))
