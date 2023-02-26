@@ -235,10 +235,14 @@ move until they are not able to go anywhere else with the time left'''
    n_walk: number of realisations of the random walk during Dt max time'''
 
 def node_walkers(G, Dt, v, pos, n_walk):   
-    # calculating the time of each edge
+    # calculating the time intrinsec to each edge
     delta_t = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
             for edge in G.edges}
     nx.set_edge_attributes(G, delta_t, name = 'dt')
+    # upper bound for steps
+    min_edge_time = min(nx.get_edge_attributes(G, 'dt').values())
+    max_steps  = int(Dt/min_edge_time)
+    print('maximum steps allowed each realisation', max_steps)
     #overall_node/edge_weights account for all the edge/node passings summed for 
     #n_walk iterations
     overall_node_weights= {node:0 for node in list(G.nodes)}
@@ -253,11 +257,6 @@ def node_walkers(G, Dt, v, pos, n_walk):
         #each node/edge in 1 realisation 
         weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
         edge_weights = {i_edge:0 for i_edge in list(G.edges)}
-    
-        # upper bound for steps
-        min_edge_time = min(nx.get_edge_attributes(G, 'dt').values())
-        max_steps  = int(Dt/min_edge_time)
-        print('maximum steps allowed each realisation', max_steps)
         #first let's difine the time used for each walker
         time = np.zeros(len(initial_nodes))
         last_time = np.copy(time)#just for checking
@@ -267,8 +266,7 @@ def node_walkers(G, Dt, v, pos, n_walk):
         #through a neighboring edge
         for step in range(max_steps):
             #list of neighboring nodes of each walker
-            neighbors = [[n for n in (list(G.successors(walker))+
-                                      list(G.predecessors(walker)))] for walker
+            neighbors = [[n for n in nx.all_neighbors(G, walker)] for walker
                          in initial_nodes]
 #            print(neighbors)
             #now randomly move the random walker to another node only if time+edge_time
@@ -536,7 +534,7 @@ def countTriangle(G, isDirected):
     else:
         print('Error: Graph is not directed')
 
-#%% ALTERNATIVE WAY TO FND TRIANGLES (fasster)
+#%% ALTERNATIVE WAY TO FND TRIANGLES (faster)
 
 import networkx as nx
 from itertools import combinations, permutations
@@ -738,7 +736,7 @@ def hodge_decomposition(G, attr_name):
         har_comp = {}
         for edge, har in zip(G.edges, g_har_vec):
             har_comp[edge] = har
-    return grad_comp, sol_comp, har_comp, pot_nodes
+    return grad_comp, sol_comp, har_comp, pot_nodes, div
 #%% CUSTOM GRAPH
 
 g = nx.DiGraph()
@@ -1149,7 +1147,7 @@ nx.set_node_attributes(ini_del, pointIDXY, name = 'pos')
 #plt.show()
 
 
-### DELAUNAY
+### CIRCULATING DELAUNAY
 del_dg = nx.DiGraph(ini_del)
 
 out_edges = [edge for edge in del_dg.edges if edge[1]>edge[0]]#removing problematic edges
@@ -1170,8 +1168,8 @@ for edge in del_dg.edges:
             remove.append(edge)
     elif (pos_1 in clust_1 and pos_2 in clust_2) or (pos_1 in clust_3 and pos_2 
     in clust_4) or (pos_1 in clust_2 and pos_2 in clust_1) or (pos_1 in clust_4
-                                                               and pos_2 
-                                                               in clust_3):
+                                                                and pos_2 
+                                                                in clust_3):
         remove.append(edge)
 del_dg.remove_edges_from(remove)
 plt.figure()
@@ -1187,7 +1185,7 @@ walk_del = node_walkers(del_dg, Dt,v,pointIDXY,n_walk)
 
 
 #%%
-grad_del, sol_del, har_del, div_del = hodge_decomposition(walk_del, 'edge_visits')
+grad_del, sol_del, har_del, pot_del, div_del = hodge_decomposition(walk_del, 'edge_visits')
 #%%
 pos_c = pointIDXY
 
@@ -1199,39 +1197,70 @@ har_del = {comp:round(har_del[comp], 2) for comp in har_del.keys()}
 edge_del = nx.get_edge_attributes(walk_del, 'edge_visits')
 
 
-plt.subplots(2,2, figsize = (10,15))
+plt.subplots(2,2, figsize = (15,15))
 plt.subplot(221)
-plt.title('original')
+plt.title('Original Graph')
 
-color_p = list(div_del.values())
-colors = range(int(min(color_p)),int(max(color_p)))
-cmap=plt.cm.seismic
-vmin = min(colors)
-vmax = max(colors)
-
-
-nx.draw_networkx(walk_del, pos = pos_c, with_labels=False, node_color=color_p,
-                 cmap=cmap, vmin=vmin, vmax=vmax, node_size = 10)
-
-sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
-sm._A = []
-plt.colorbar(sm)
-
-
-plt.subplot(222)
-color_g = np.abs(np.array(list(grad_del.values())))
-#plotting edges with color gradient
 color_p = np.abs(np.array(list(edge_del.values())))
 colors = np.linspace(0,np.max(color_p))
 cmap=plt.cm.Oranges
 vmin = min(colors)
 vmax = max(colors)
-plt.title('gradient')
-nx.draw_networkx(walk_del, pos = pos_c, with_labels=False, node_size = 10,
-                 edge_color=color_g, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+
+color_div = list(div_del.values())
+colors_div = range(int(min(color_div)),int(max(color_div)))
+cmap_div=plt.cm.seismic
+vmin_div = -max(colors_div)
+vmax_div = max(colors_div)
+
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, node_size = 10)
+                       # node_color=color_div, cmap=cmap_div, vmin=vmin_div, 
+                       # vmax=vmax_div, node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_p,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
 sm._A = []
-plt.colorbar(sm)
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega\right|$')
+
+sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin = vmin_div, 
+                                                              vmax=vmax_div))
+sm2._A = []
+cbar2 = plt.colorbar(sm2, location = 'right')
+cbar2.set_label(r'Node divergence')
+
+plt.subplot(222)
+color_g = np.abs(np.array(list(grad_del.values())))
+#plotting edges with color gradient
+
+color_pot = list(pot_del.values())
+colors_pot = range(int(min(color_pot)),int(max(color_pot)))
+cmap_pot=plt.cm.seismic
+vmin_pot = min(colors_pot)
+vmax_pot = max(colors_pot)
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+plt.title('Gradient component')
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, 
+                        node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_g,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_g\right|$')
+
+sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin = vmin_pot, 
+                                                              vmax=vmax_pot))
+sm2._A = []
+cbar2 = plt.colorbar(sm2, location = 'right')
+cbar2.set_label(r'Node potentials')
 
 color_p = np.abs(np.array(list(edge_del.values())))
 colors = np.linspace(0,np.max(color_p))
@@ -1241,13 +1270,18 @@ vmax = max(colors)
 
 color_s = np.abs(np.array(list(sol_del.values())))
 plt.subplot(223)
-plt.title('solenoidal')
-nx.draw_networkx(walk_del,pos = pos_c, with_labels=False, node_size = 10,
-                 edge_color=color_s, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+plt.title('Solenoidal Component')
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_s,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+# nx.draw_networkx(walk_del,pos = pos_c, with_labels=False, node_size = 10,
+#                  edge_color=color_s, edge_cmap=cmap, vmin=vmin, vmax=vmax)
 
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
 sm._A = []
-plt.colorbar(sm)
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_s\right|$')
+
 
 color_p = np.abs(np.array(list(edge_del.values())))
 colors = np.linspace(0,np.max(color_p))
@@ -1257,14 +1291,38 @@ vmax = max(colors)
 
 color_h = np.abs(np.array(list(har_del.values())))
 plt.subplot(224)
-plt.title('harmonic')
-nx.draw_networkx(walk_del,pos = pos_c, with_labels=False, node_size = 10,
-                 edge_color=color_h, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+plt.title('Harmonic Component')
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_h,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
 sm._A = []
-plt.colorbar(sm)
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_h\right|$')
+
 plt.tight_layout()
 plt.show()
+#%%IMPORTANCE OF EACH COMPONENT
+
+w = np.array(list(edge_del.values()))
+wg = np.array(list(grad_del.values()))
+ws = np.array(list(sol_del.values()))
+wh = np.array(list(har_del.values()))
+weight_g = np.sum(np.square(wg))/np.sum(np.square(w))
+weight_s =np.sum(np.square(ws))/np.sum(np.square(w))
+weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
+
+print(weight_g,weight_s, weight_h, weight_g+weight_s+weight_h)
+
+# alpha_g = np.max(wg)-np.min(wg)
+# k_g = np.min(wg)
+# alpha_s = np.max(ws)-np.min(ws)
+# k_s = np.min(ws)
+# alpha_h = np.max(wh)-np.min(wh)
+# k_h = np.min(wh)
+# print((alpha_g, k_g),(alpha_s, k_s), (alpha_h, k_h))
+
+# print(np.sum(wg)/np.sum(w), np.sum(ws)/np.sum(w), np.sum(wh)/np.sum(w))
 #%%
 import math
 plt.figure()
@@ -1275,3 +1333,118 @@ x = np.linspace(-60, 20, 100)
 def gauss(x, mu, std):
     return(np.exp(-0.5*((x-mu)/std)**2)/(std*np.sqrt(2*np.pi)))
 plt.plot(x, gauss(x, mean, std))
+#%% STAR GRAPH TO SEE THE POTENTIALS
+
+star = nx.star_graph(30)
+star_dg = nx.DiGraph(star)
+
+out_edges = [edge for edge in star_dg.edges if edge[1]>edge[0]]#removing problematic edges
+star_dg.remove_edges_from(out_edges)
+pos = nx.kamada_kawai_layout(star_dg)
+
+Dt = 100
+v = 1
+n_walk = 20
+walk_star = node_walkers(star_dg, Dt,v,pos,n_walk)
+
+
+#%%
+grad_star, sol_star, har_star, pot_star = hodge_decomposition(walk_star, 'edge_visits')
+#%%
+edge_star = nx.get_edge_attributes(walk_star, 'edge_visits')
+grad_star = {comp:round(grad_star[comp],1) for comp in grad_star.keys()}
+har_star = {comp:round(har_star[comp], 2) for comp in har_star.keys()}
+
+plt.subplots(2,2, figsize = (15,15))
+plt.subplot(221)
+plt.title('Original Graph')
+
+color_p = np.abs(np.array(list(edge_star.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+print(vmin,vmax)
+
+nx.draw_networkx_nodes(walk_star, pos = pos, node_size = 10)
+nx.draw_networkx_edges(walk_star, pos = pos, label=None, edge_color=color_p,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+nx.draw_networkx_edge_labels(walk_star ,pos = pos, edge_labels = edge_star, 
+                             rotate = False, font_size = 8)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega\right|$')
+
+plt.subplot(222)
+color_g = np.abs(np.array(list(grad_star.values())))
+#plotting edges with color gradient
+
+color_pot = list(pot_star.values())
+colors_pot = range(int(min(color_pot)),int(max(color_pot)))
+cmap_pot=plt.cm.seismic
+vmin_pot = min(colors_pot)
+vmax_pot = max(colors_pot)
+
+color_p = np.abs(np.array(list(edge_star.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+print(vmin,vmax)
+plt.title('Gradient component')
+nx.draw_networkx_nodes(walk_star, pos = pos, label=None, 
+                       node_color=color_pot, cmap=cmap_pot, vmin=vmin_pot, 
+                       vmax=vmax_pot, node_size = 10)
+nx.draw_networkx_edges(walk_star, pos = pos, label=None, edge_color=color_g,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+nx.draw_networkx_edge_labels(walk_star ,pos = pos, edge_labels = grad_star, 
+                             rotate = False, font_size = 8)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_g\right|$')
+
+sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin = vmin_pot, 
+                                                              vmax=vmax_pot))
+sm2._A = []
+cbar2 = plt.colorbar(sm2, location = 'right')
+cbar2.set_label(r'Node potentials')
+
+color_p = np.abs(np.array(list(edge_star.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_s = np.abs(np.array(list(sol_star.values())))
+plt.subplot(223)
+plt.title('Solenoidal Component')
+nx.draw_networkx(walk_star,pos = pos, with_labels=False, node_size = 10,
+                 edge_color=color_s, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_s\right|$')
+
+
+color_p = np.abs(np.array(list(edge_star.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_h = np.abs(np.array(list(har_star.values())))
+plt.subplot(224)
+plt.title('Harmonic Component')
+nx.draw_networkx(walk_star,pos = pos, with_labels=False, node_size = 10,
+                 edge_color=color_h, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_h\right|$')
+
+plt.tight_layout()
+plt.show()
