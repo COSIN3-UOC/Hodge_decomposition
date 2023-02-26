@@ -223,7 +223,7 @@ a_dists = np.array([graph[i[0]][i[1]]['dist'] for i in graph.edges(a)])
 print(graph.edges(a))
 print(np.where(a_dists/2< 0.3))
 print(graph.nodes[a]['pos'])
-#%% NODE_WALKERS (walk during Dt)
+#%% NODE_WALKERS (walk during Dt) (time/n_wak = 25s for clusters of 100 points)
 '''Function that puts n = len(list(G.nodes)) random walkers in a Digraph 
 transitable in both directions and moves them during Dt time. The walkers always 
 move until they are not able to go anywhere else with the time left'''
@@ -245,17 +245,17 @@ def node_walkers(G, Dt, v, pos, n_walk):
     print('maximum steps allowed each realisation', max_steps)
     #overall_node/edge_weights account for all the edge/node passings summed for 
     #n_walk iterations
-    overall_node_weights= {node:0 for node in list(G.nodes)}
+    #overall_node_weights= {node:0 for node in list(G.nodes)}
     overall_edge_weights = {edge: 0 for edge in list(G.edges)}
     for i in range(0, n_walk):
         print('realisation '+str(i+1)+'/'+str(n_walk))
-        path = []
+        # path = []
         initial_nodes = sorted(list(G.nodes))
         #path stores the position of each walker in each time step
-        path.append(initial_nodes)
+        # path.append(initial_nodes)
         #weights/edge_weights counts the amount of times a walker has visited 
         #each node/edge in 1 realisation 
-        weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
+        #weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
         edge_weights = {i_edge:0 for i_edge in list(G.edges)}
         #first let's difine the time used for each walker
         time = np.zeros(len(initial_nodes))
@@ -266,8 +266,9 @@ def node_walkers(G, Dt, v, pos, n_walk):
         #through a neighboring edge
         for step in range(max_steps):
             #list of neighboring nodes of each walker
-            neighbors = [[n for n in nx.all_neighbors(G, walker)] for walker
-                         in initial_nodes]
+            neighbors = [{n: (G[walker][n]['dt'] if (walker, n) in list(G.edges) 
+                          else G[n][walker]['dt']) for n in 
+                          nx.all_neighbors(G, walker)} for walker in initial_nodes]
 #            print(neighbors)
             #now randomly move the random walker to another node only if time+edge_time
             #is < Dt
@@ -275,15 +276,12 @@ def node_walkers(G, Dt, v, pos, n_walk):
             #checks how many walkers have nowhere left to go
             ended_walkers = 0
             # print(step)
-            for node, goto_nodes in zip(initial_nodes,neighbors):
+            for goto_nodes in neighbors:
                 #time of each possible edge for a given node
 
-                goto_dt = np.array([G[node][n]['dt'] if (node,n) in list(G.edges)
-                                       else G[n][node]['dt'] for n in 
-                                       goto_nodes])
-                if np.any(time[ind]+goto_dt <= Dt):
-                    possible_nodes = [goto_nodes[k] for k in 
-                                      list(np.where(time[ind]+goto_dt <= Dt)[0])]
+                if np.any(time[ind]+ np.array(list(goto_nodes.values())) <= Dt):
+                    possible_nodes = [k for k in goto_nodes.keys() if 
+                                      (goto_nodes[k]+time[ind]) <= Dt]
                     sel = random.choice(possible_nodes)
                     final_nodes[ind] = sel 
                 else:
@@ -296,7 +294,7 @@ def node_walkers(G, Dt, v, pos, n_walk):
                     (final_nodes[j],initial_nodes[j]) in list(G.edges) else t 
                     for j, t in enumerate(time)]
             # print(time)
-            path.append(np.copy(final_nodes))
+            # path.append(np.copy(final_nodes))
             #counting edge visits according to direction of edge         
             for node_i, node_f in zip(initial_nodes, final_nodes):
                 if node_i != node_f:
@@ -307,9 +305,9 @@ def node_walkers(G, Dt, v, pos, n_walk):
                     else:
                         print('ini different than final but edge not in graph')
             #count the occutpation of each node after the moves
-            for node_i, node_f in zip(initial_nodes, final_nodes):
-                if node_i != node_f:
-                    weights[node_i] += 1
+            # for node_i, node_f in zip(initial_nodes, final_nodes):
+            #     if node_i != node_f:
+            #         weights[node_i] += 1
                 
             initial_nodes = np.copy(final_nodes)
             if ended_walkers == len(initial_nodes):
@@ -320,14 +318,85 @@ def node_walkers(G, Dt, v, pos, n_walk):
             last_time = np.copy(np.array(time))
         for edge in G.edges:
             overall_edge_weights[edge] += edge_weights[edge]
-        for node in G.nodes:
-            overall_node_weights[node] += weights[node]
-        #set node value as the number of visits of each value
-        # print(weights)
-    nx.set_node_attributes(G, overall_node_weights, name='weights')
+    #     for node in G.nodes:
+    #         overall_node_weights[node] += weights[node]
+    #     #set node value as the number of visits of each value
+    #     # print(weights)
+    # nx.set_node_attributes(G, overall_node_weights, name='weights')
     nx.set_edge_attributes(G, overall_edge_weights, name = 'edge_visits')
     return(G)
 
+#%% optimized node_walkers (time/n_wak = 11s for clusters of 100 points)
+
+def node_walkers(G, Dt, v, pos, n_walk):   
+    # calculating the time intrinsec to each edge
+    delta_t = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
+            for edge in G.edges}
+    nx.set_edge_attributes(G, delta_t, name = 'dt')
+    # upper bound for steps
+    min_edge_time = min(nx.get_edge_attributes(G, 'dt').values())
+    max_steps  = int(Dt/min_edge_time)
+    print('maximum steps allowed each realisation', max_steps)
+    #overall_node/edge_weights account for all the edge/node passings summed for 
+    #n_walk iterations
+    #overall_node_weights= {node:0 for node in list(G.nodes)}
+    overall_edge_weights = {edge: 0 for edge in list(G.edges)}
+    for i in range(0, n_walk):
+        print('realisation '+str(i+1)+'/'+str(n_walk))
+        #dictionary of walker index:current_node the walker is in
+        pos_walkers = {i:i for i in G.nodes}
+        
+        #weights/edge_weights counts the amount of times a walker has visited 
+        #each node/edge in 1 realisation 
+        edge_weights = {i_edge:0 for i_edge in list(G.edges)}
+        #first let's difine the time used for each walker
+        time = {node_ind:0 for node_ind in G.nodes}
+        active_walkers = {node_ind:1 for node_ind in G.nodes}
+        # 1 step moves (or tries to move according to time left) all the walkers
+        #through a neighboring edge
+        for step in range(max_steps):
+            #list of active walkers indices
+            active_ls = [walk_ind for walk_ind in active_walkers.keys() 
+                         if active_walkers[walk_ind] == 1]
+            if len(active_ls) == 0:
+                print('all walkers finished, steps needed for this realisation '
+                      +str(step)+'/'+str(max_steps))
+                break
+
+            #list of neighboring nodes of each walker
+            neighbors = [{n: (G[pos_walkers[walker]][n]['dt'] if (pos_walkers[walker], n) 
+                              in list(G.edges) else G[n][pos_walkers[walker]]['dt'])
+                          for n in nx.all_neighbors(G, pos_walkers[walker])} 
+                         for walker in active_ls]
+#            print(neighbors)
+            #now randomly move the random walker to another node only if time+edge_time
+            #is < Dt
+            for walker, goto_nodes in zip(active_ls, neighbors):
+                #time of each possible edge for a given node
+                if np.any(time[walker]+ np.array(list(goto_nodes.values())) <= Dt):
+                    #list of the possible final nodes
+                    possible_nodes = [k for k in goto_nodes.keys() if 
+                                      (goto_nodes[k]+time[walker]) <= Dt]
+                    #random selection between the final nodes
+                    sel = random.choice(possible_nodes)
+                    #updating edge flow dict
+                    if (pos_walkers[walker], sel) in list(G.edges):
+                        edge_weights[(pos_walkers[walker], sel)] += 1
+                    elif (sel, pos_walkers[walker]) in list(G.edges):
+                        edge_weights[(sel,pos_walkers[walker])] -= 1
+                    else:
+                        print('ini different than final but edge not in graph')
+                    
+                    #updating walker position and time
+                    pos_walkers[walker] = sel 
+                    time[walker]+=goto_nodes[sel]
+                else:
+                    # print(time[ind])
+                    active_walkers[walker] = 0      
+        for edge in G.edges:
+            overall_edge_weights[edge] += edge_weights[edge]
+    nx.set_edge_attributes(G, overall_edge_weights, name = 'edge_visits')
+    return(G)
 #%%
 min_dist = min(nx.get_edge_attributes(graph, 'dist').values())
 max_dist = max(nx.get_edge_attributes(graph, 'dist').values())
@@ -1091,7 +1160,7 @@ plt.colorbar(sm)
 plt.tight_layout()
 plt.show()
 #%% CIRCULATING DELAUNAYS
-
+import time 
 '''CIRCULATING DELAUNAYS'''
 
 
@@ -1181,8 +1250,9 @@ nx.draw_networkx(del_dg, pos = pointIDXY, with_labels = False, node_size = 10)
 Dt = 100
 v = 0.1
 n_walk = 20
+start_time = time.time()
 walk_del = node_walkers(del_dg, Dt,v,pointIDXY,n_walk)
-
+print("--- %s seconds ---" % (time.time() - start_time))
 
 #%%
 grad_del, sol_del, har_del, pot_del, div_del = hodge_decomposition(walk_del, 'edge_visits')
@@ -1314,15 +1384,6 @@ weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
 
 print(weight_g,weight_s, weight_h, weight_g+weight_s+weight_h)
 
-# alpha_g = np.max(wg)-np.min(wg)
-# k_g = np.min(wg)
-# alpha_s = np.max(ws)-np.min(ws)
-# k_s = np.min(ws)
-# alpha_h = np.max(wh)-np.min(wh)
-# k_h = np.min(wh)
-# print((alpha_g, k_g),(alpha_s, k_s), (alpha_h, k_h))
-
-# print(np.sum(wg)/np.sum(w), np.sum(ws)/np.sum(w), np.sum(wh)/np.sum(w))
 #%%
 import math
 plt.figure()
