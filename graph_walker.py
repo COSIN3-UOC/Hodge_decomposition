@@ -326,7 +326,16 @@ def node_walkers(G, Dt, v, pos, n_walk):
     nx.set_edge_attributes(G, overall_edge_weights, name = 'edge_visits')
     return(G)
 
-#%% optimized node_walkers (time/n_wak = 11s for clusters of 100 points)
+#%% OPTIMIZED NODE_WALKERS (time/n_wak = 11s for clusters of 100 points)
+'''Function that puts n = len(list(G.nodes)) random walkers in a Digraph 
+transitable in both directions and moves them during Dt time. The walkers always 
+move until they are not able to go anywhere else with the time left'''
+
+'''G: nx.DiGraph
+   Dt: Maximum moving time
+   v: velocity of the walkers
+   pos: dictionary with positions of each node in the DiGraph {node:(posx,pos_y)}
+   n_walk: number of realisations of the random walk during Dt max time'''
 
 def node_walkers(G, Dt, v, pos, n_walk):   
     # calculating the time intrinsec to each edge
@@ -337,28 +346,27 @@ def node_walkers(G, Dt, v, pos, n_walk):
     min_edge_time = min(nx.get_edge_attributes(G, 'dt').values())
     max_steps  = int(Dt/min_edge_time)
     print('maximum steps allowed each realisation', max_steps)
-    #overall_node/edge_weights account for all the edge/node passings summed for 
+    #overall_edge_weights account for all the edge passings summed for 
     #n_walk iterations
-    #overall_node_weights= {node:0 for node in list(G.nodes)}
     overall_edge_weights = {edge: 0 for edge in list(G.edges)}
     for i in range(0, n_walk):
         print('realisation '+str(i+1)+'/'+str(n_walk))
         #dictionary of walker index:current_node the walker is in
         pos_walkers = {i:i for i in G.nodes}
         
-        #weights/edge_weights counts the amount of times a walker has visited 
-        #each node/edge in 1 realisation 
+        #edge_weights counts the amount of times a walker has visited 
+        #each edge in 1 realisation 
         edge_weights = {i_edge:0 for i_edge in list(G.edges)}
         #first let's difine the time used for each walker
         time = {node_ind:0 for node_ind in G.nodes}
-        active_walkers = {node_ind:1 for node_ind in G.nodes}
+        active_walkers = {node_ind : True for node_ind in G.nodes}
         # 1 step moves (or tries to move according to time left) all the walkers
         #through a neighboring edge
         for step in range(max_steps):
             #list of active walkers indices
             active_ls = [walk_ind for walk_ind in active_walkers.keys() 
-                         if active_walkers[walk_ind] == 1]
-            if len(active_ls) == 0:
+                         if active_walkers[walk_ind]]
+            if len(active_ls) == 0:#all walkers have finished
                 print('all walkers finished, steps needed for this realisation '
                       +str(step)+'/'+str(max_steps))
                 break
@@ -391,8 +399,8 @@ def node_walkers(G, Dt, v, pos, n_walk):
                     pos_walkers[walker] = sel 
                     time[walker]+=goto_nodes[sel]
                 else:
-                    # print(time[ind])
-                    active_walkers[walker] = 0      
+                    # desactivate the walker that has finished
+                    active_walkers[walker] = False      
         for edge in G.edges:
             overall_edge_weights[edge] += edge_weights[edge]
     nx.set_edge_attributes(G, overall_edge_weights, name = 'edge_visits')
@@ -675,7 +683,7 @@ def hodge_decomposition(G, attr_name):
         grad_arr.append(row)
         row = []
     grad_arr = np.array(grad_arr)
-    print('gradient op\n',grad_arr)
+    #print('gradient op\n',grad_arr)
 #LAPLACIAN MATRIX  
     lap = np.transpose(grad_arr).dot(grad_arr)
     # print('checking solvability',np.linalg.cond(lap))
@@ -688,7 +696,7 @@ def hodge_decomposition(G, attr_name):
     #print('divergence\n',div_arr)
     
     pot_field = np.squeeze(np.asarray(Apinv.dot(-div_arr)))
-    print('error in node potentials', lap.dot(pot_field)+div_arr)
+    #print('error in node potentials', lap.dot(pot_field)+div_arr)
     #gradient of the potential field
     # pot_field.insert(remove_index, 0)
     pot_nodes = {n:pot for n, pot in enumerate(pot_field)}
@@ -753,7 +761,7 @@ def hodge_decomposition(G, attr_name):
 #        print(curl_op)
         #computing the curl of the graph
         rot = curl_op.dot(g_field)
-        print('big rot arr\n',curl_op.dot(np.transpose(curl_op)))
+        #print('big rot arr\n',curl_op.dot(np.transpose(curl_op)))
         # print('curl_op',curl_op)
         # print('field',g_field)
         # print('solvability of curl comp', np.linalg.cond(rot_arr))
@@ -762,8 +770,8 @@ def hodge_decomposition(G, attr_name):
         #solving the system of equations
         tri_pot = rot_arr_inv.dot(g_field)
         # tri_pot = np.squeeze(np.asarray(rot_pinv.dot(rot)))
-        print('error curl component',
-              curl_op.dot(np.transpose(curl_op)).dot(tri_pot)-rot)
+        # print('error curl component',
+        #       curl_op.dot(np.transpose(curl_op)).dot(tri_pot)-rot)
         #solenoidal component is delta1* (transpose of curl op) of the potential:
         g_s = np.transpose(curl_op).dot(tri_pot)
         print('curl of graph', 
@@ -787,7 +795,6 @@ def hodge_decomposition(G, attr_name):
 #        print(big_arr)
     
     g_har_vec = g_field - grad_comp_arr - g_s
-    print(g_har_vec)
     thrs = 10**(-10)
     if np.all(np.abs(big_arr.dot(g_har_vec)) < thrs):
         
@@ -910,10 +917,11 @@ wheel_d.remove_edges_from(out_edges)
 plt.figure(figsize = (8,8))
 nx.draw_networkx(wheel_d,pos = pos_c, with_labels=True)
 
-steps = 10
-n_walk = 1
+Dt = 10
+n_walk = 10
+v = 1
 
-walk_wh = node_walkers(wheel_d,100, 0.04,pos_c)
+walk_wh = node_walkers(wheel_d, Dt, v, pos_c,n_walk)
 #walk_wh = digraph_walkers(wheel_d, steps, n_walk)
 
 plt.figure(figsize = (8,8))
@@ -923,9 +931,9 @@ nx.draw_networkx_edge_labels(walk_wh ,pos = pos_c, edge_labels =
                              rotate = False, font_size = 8)
 plt.tight_layout()
 plt.show()
-
-grad_wh, sol_wh, har_wh, div_wh = hodge_decomposition(walk_wh, 'edge_visits')
-
+#%%
+grad_wh, sol_wh, har_wh, pot_wh, div_wh = hodge_decomposition(walk_wh, 'edge_visits')
+#%%
 
 grad_wh = {comp:round(grad_wh[comp],2) for comp in grad_wh.keys()}
 sol_wh = {comp:round(sol_wh[comp], 2) for comp in sol_wh.keys()}
@@ -959,6 +967,19 @@ nx.draw_networkx_edge_labels(wheel_d ,pos = pos_c, edge_labels = har_wh,
 plt.tight_layout()
 plt.show()
 
+#%%
+#%%IMPORTANCE OF EACH COMPONENT
+
+w = np.array(list(edge_wh.values()))
+wg = np.array(list(grad_wh.values()))
+ws = np.array(list(sol_wh.values()))
+wh = np.array(list(har_wh.values()))
+weight_g = np.sum(np.square(wg))/np.sum(np.square(w))
+weight_s =np.sum(np.square(ws))/np.sum(np.square(w))
+weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
+
+print(weight_g,weight_s, weight_h, weight_g+weight_s+weight_h)
+
 #%% 2 CLUSTER DELAUNAY
 '''Delaunay'''
 
@@ -968,16 +989,16 @@ we will create 2 clusters of points normally distributed
 from scipy.spatial import Delaunay
 #x,y coords of points
 np.random.seed(1000)
-nodes_cl1 = 2
-nodes_cl2 = 2
-# clust_1 = np.random.normal(0, 1, size = (nodes_cl1,2))
-# clust_2 = np.random.normal(5, 1, size = (nodes_cl2,2))
+nodes_cl1 = 200
+nodes_cl2 = 200
+clust_1 = np.random.normal(0, 1, size = (nodes_cl1,2))
+clust_2 = np.random.normal(5, 1, size = (nodes_cl2,2))
 
 # clust_1 = np.array([[0,0], [0,1], [1,0]])
 # clust_2 = clust_1+2
 
-clust_1 = np.array([[0,0], [0.5,0.5], [1,0], [0.5,-0.5]])
-clust_2 = clust_1+2
+# clust_1 = np.array([[0,0], [0.5,0.5], [1,0], [0.5,-0.5]])
+# clust_2 = clust_1+2
 
 clusters = np.concatenate((clust_1,clust_2), axis = 0)
 tri = Delaunay(clusters)
@@ -1024,20 +1045,17 @@ del_dg.remove_edges_from(out_edges)
 # for edge in out_edges:
 #     if (edge[1],edge[0]) not in del_dg.edges:
 #         del_dg.add_edge(edge[1],edge[0])
-nx.draw_networkx(del_dg, pos = pointIDXY, with_labels = True)   
+# nx.draw_networkx(del_dg, pos = pointIDXY, with_labels = True)   
 Dt = 10
 v = 1
-n_walk = 1
+n_walk = 10
 walk_del = node_walkers(del_dg, Dt,v,pointIDXY,n_walk)
 
 
 #%%
-grad_del, sol_del, har_del, div_del = hodge_decomposition(walk_del, 'edge_visits')
-
+grad_del, sol_del, har_del, pot_del, div_del  = hodge_decomposition(walk_del, 'edge_visits')
+#%%
 pos_c = pointIDXY
-
-# Computing divergence
-div = {node:np.array([0.0,0.0]) for node in walk_del.nodes}
 
 for node in walk_del.nodes:
     for in_edge in walk_del.in_edges(node):
@@ -1051,33 +1069,125 @@ sol_del = {comp:round(sol_del[comp], 2) for comp in sol_del.keys()}
 har_del = {comp:round(har_del[comp], 2) for comp in har_del.keys()}
 
 edge_del = nx.get_edge_attributes(walk_del, 'edge_visits')
-plt.subplots(2,2, figsize = (10,15))
+
+
+plt.subplots(2,2, figsize = (15,15))
 plt.subplot(221)
-plt.title('original')
-nx.draw_networkx(walk_del, pos = pos_c, with_labels=True, node_size = 100)
-nx.draw_networkx_edge_labels(walk_del ,pos = pos_c, edge_labels = edge_del, 
-                             rotate = False, font_size = 8)
+plt.title('Original Graph')
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_div = list(div_del.values())
+colors_div = range(int(min(color_div)),int(max(color_div)))
+cmap_div=plt.cm.seismic
+vmin_div = -max(colors_div)
+vmax_div = max(colors_div)
+
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, node_size = 10)
+                       # node_color=color_div, cmap=cmap_div, vmin=vmin_div, 
+                       # vmax=vmax_div, node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_p,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega\right|$')
+
+sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin = vmin_div, 
+                                                              vmax=vmax_div))
+sm2._A = []
+cbar2 = plt.colorbar(sm2, location = 'right')
+cbar2.set_label(r'Node divergence')
 
 plt.subplot(222)
-plt.title('gradient')
-nx.draw_networkx(walk_del, pos = pos_c, with_labels=True, node_size = 100)
-nx.draw_networkx_edge_labels(walk_del ,pos = pos_c, edge_labels = grad_del, 
-                             rotate = False, font_size = 8)
+color_g = np.abs(np.array(list(grad_del.values())))
+#plotting edges with color gradient
 
+color_pot = list(pot_del.values())
+colors_pot = range(int(min(color_pot)),int(max(color_pot)))
+cmap_pot=plt.cm.seismic
+vmin_pot = min(colors_pot)
+vmax_pot = max(colors_pot)
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+plt.title('Gradient component')
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, 
+                        node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_g,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_g\right|$')
+
+sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin = vmin_pot, 
+                                                              vmax=vmax_pot))
+sm2._A = []
+cbar2 = plt.colorbar(sm2, location = 'right')
+cbar2.set_label(r'Node potentials')
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_s = np.abs(np.array(list(sol_del.values())))
 plt.subplot(223)
-plt.title('solenoidal')
-nx.draw_networkx(walk_del,pos = pos_c, with_labels=True, node_size = 100)
-nx.draw_networkx_edge_labels(walk_del ,pos_c, edge_labels = sol_del, 
-                             rotate = False, font_size = 8)
+plt.title('Solenoidal Component')
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_s,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+# nx.draw_networkx(walk_del,pos = pos_c, with_labels=False, node_size = 10,
+#                  edge_color=color_s, edge_cmap=cmap, vmin=vmin, vmax=vmax)
 
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_s\right|$')
+
+
+color_p = np.abs(np.array(list(edge_del.values())))
+colors = np.linspace(0,np.max(color_p))
+cmap=plt.cm.Oranges
+vmin = min(colors)
+vmax = max(colors)
+
+color_h = np.abs(np.array(list(har_del.values())))
 plt.subplot(224)
-plt.title('harmonic')
-nx.draw_networkx(walk_del,pos = pos_c, with_labels=True, node_size = 100)
-nx.draw_networkx_edge_labels(walk_del ,pos = pos_c, edge_labels = har_del, 
-                             rotate = False, font_size = 8)
+plt.title('Harmonic Component')
+nx.draw_networkx_nodes(walk_del, pos = pos_c, label=None, node_size = 10)
+nx.draw_networkx_edges(walk_del, pos = pos_c, label=None, edge_color=color_h,
+                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+sm._A = []
+cbar = plt.colorbar(sm)
+cbar.set_label(r'$\left|\omega_h\right|$')
+
 plt.tight_layout()
 plt.show()
 
+#%%IMPORTANCE OF EACH COMPONENT
+
+w = np.array(list(edge_del.values()))
+wg = np.array(list(grad_del.values()))
+ws = np.array(list(sol_del.values()))
+wh = np.array(list(har_del.values()))
+weight_g = np.sum(np.square(wg))/np.sum(np.square(w))
+weight_s =np.sum(np.square(ws))/np.sum(np.square(w))
+weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
+
+print(weight_g,weight_s, weight_h, weight_g+weight_s+weight_h)
 #%% FRUCHT GRAPH TO SEE HARMONIC SOLENOIDAL AND GRADIENT COMPONENTS AT THE SAME TIME
 
 #frucht graph
@@ -1372,6 +1482,135 @@ cbar.set_label(r'$\left|\omega_h\right|$')
 
 plt.tight_layout()
 plt.show()
+#%%
+def plot_hodge(walk_graph, grad_comp, sol_comp,har_comp, pot, div, pos):
+
+    edge_graph = nx.get_edge_attributes(walk_graph, 'edge_visits')
+    
+    edge_eix = nx.get_edge_attributes(walk_eix, 'edge_visits')
+    w = np.array(list(edge_eix.values()))
+    wg = np.array(list(grad_eix.values()))
+    ws = np.array(list(sol_eix.values()))
+    wh = np.array(list(har_eix.values()))
+    weight_g = np.sum(np.square(wg))/np.sum(np.square(w))
+    weight_s =np.sum(np.square(ws))/np.sum(np.square(w))
+    weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
+
+    print(weight_g,weight_s, weight_h, weight_g+weight_s+weight_h)
+
+    plt.subplots(2,2, figsize = (15,15))
+    plt.subplot(221)
+    plt.title('Original Graph 100%')
+
+    color_p = np.abs(np.array(list(edge_graph.values())))
+    colors = np.linspace(0,np.max(color_p))
+    cmap=plt.cm.Oranges
+    vmin = min(colors)
+    vmax = max(colors)
+
+    color_div = list(div.values())
+    colors_div = range(int(min(color_div)),int(max(color_div)))
+    cmap_div=plt.cm.seismic
+    vmin_div = -max(colors_div)
+    vmax_div = max(colors_div)
+
+    nx.draw_networkx_nodes(walk_graph, pos = pos, label=None, node_size = 1,
+                            node_color=color_div, cmap=cmap_div, vmin=vmin_div, 
+                            vmax=vmax_div)
+    nx.draw_networkx_edges(walk_graph, pos = pos, label=None, edge_color=color_p,
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+    sm._A = []
+    cbar = plt.colorbar(sm)
+    cbar.set_label(r'$\left|\omega\right|$')
+
+    sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin = vmin_div, 
+                                                                  vmax=vmax_div))
+    sm2._A = []
+    cbar2 = plt.colorbar(sm2, location = 'right')
+    cbar2.set_label(r'Node divergence')
+
+    plt.subplot(222)
+    color_g = np.abs(np.array(list(grad_comp.values())))
+    #plotting edges with color gradient
+
+    color_pot = list(pot.values())
+    colors_pot = range(int(min(color_pot)),int(max(color_pot)))
+    cmap_pot=plt.cm.seismic
+    vmin_pot = min(colors_pot)
+    vmax_pot = max(colors_pot)
+
+    color_p = np.abs(np.array(list(edge_graph.values())))
+    colors = np.linspace(0,np.max(color_p))
+    cmap=plt.cm.Oranges
+    vmin = min(colors)
+    vmax = max(colors)
+    plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%')
+    nx.draw_networkx_nodes(walk_graph, pos = pos, label=None, 
+                            node_size = 1, node_color=color_pot, cmap=cmap_pot, 
+                            vmin=vmin_pot, vmax=vmax_pot)
+    nx.draw_networkx_edges(walk_graph, pos = pos, label=None, edge_color=color_g,
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+    sm._A = []
+    cbar = plt.colorbar(sm)
+    cbar.set_label(r'$\left|\omega_g\right|$')
+
+    sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin = vmin_pot, 
+                                                                  vmax=vmax_pot))
+    sm2._A = []
+    cbar2 = plt.colorbar(sm2, location = 'right')
+    cbar2.set_label(r'Node potentials')
+
+    color_p = np.abs(np.array(list(edge_graph.values())))
+    colors = np.linspace(0,np.max(color_p))
+    cmap=plt.cm.Oranges
+    vmin = min(colors)
+    vmax = max(colors)
+
+    color_s = np.abs(np.array(list(sol_comp.values())))
+    plt.subplot(223)
+    plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%')
+    nx.draw_networkx_nodes(walk_graph, pos = pos, label=None, node_size = 1, 
+                           node_color=np.array([[0, 88/255, 173/355, 0.5]]))
+    nx.draw_networkx_edges(walk_graph, pos = pos, label=None, edge_color=color_s,
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+    # nx.draw_networkx(walk_graph,pos = pos, with_labels=False, node_size = 5,
+    #                  edge_color=color_s, edge_cmap=cmap, vmin=vmin, vmax=vmax)
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+    sm._A = []
+    cbar = plt.colorbar(sm)
+    cbar.set_label(r'$\left|\omega_s\right|$')
+
+
+    color_p = np.abs(np.array(list(edge_graph.values())))
+    colors = np.linspace(0,np.max(color_p))
+    cmap=plt.cm.Oranges
+    vmin = min(colors)
+    vmax = max(colors)
+
+    color_h = np.abs(np.array(list(har_comp.values())))
+    plt.subplot(224)
+    plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%')
+    nx.draw_networkx_nodes(walk_graph, pos = pos, label=None, node_size = 1,
+                           node_color = np.array([[0, 88/255, 173/255, 0.5]]))
+    nx.draw_networkx_edges(walk_graph, pos = pos, label=None, edge_color=color_h,
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin = vmin, vmax=vmax))
+    sm._A = []
+    cbar = plt.colorbar(sm)
+    cbar.set_label(r'$\left|\omega_h\right|$')
+
+    plt.tight_layout()
+    plt.show()
+#%%
+del_adj = nx.adjacency_matrix(walk_del,weight = 'edge_visits')
+del_adj = del_adj.todense()
+plt.figure()
+plt.matshow(del_adj)
 #%%IMPORTANCE OF EACH COMPONENT
 
 w = np.array(list(edge_del.values()))
@@ -1509,3 +1748,100 @@ cbar.set_label(r'$\left|\omega_h\right|$')
 
 plt.tight_layout()
 plt.show()
+
+#%% MAPS, GEOPANDAS
+import geopandas as gpd
+import pandas as pd
+import momepy
+from contextily import add_basemap
+from libpysal import weights
+
+bcn = gpd.read_file('/Users/robertbenassai/Documents/UOC/alertadadesconfidencialsdatosconfidencialesconfid/edges.shp', crs="EPSG:4326")
+# f, ax = plt.subplots(figsize=(10,10))
+# bcn.plot(ax = ax, color = "lightgray")
+
+# Construct the primal graph
+G_primal = momepy.gdf_to_nx(bcn, approach="primal", multigraph = False, directed = False)
+
+# Plot
+# f, ax = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)
+# bcn.plot(color="k", ax=ax[0])
+# for i, facet in enumerate(ax):
+#     facet.set_title(("Streets", "Graph")[i])
+#     facet.axis("off")
+#     add_basemap(facet)
+# nx.draw(
+#     G_primal, {n: [n[0], n[1]] for n in list(G_primal.nodes)}, ax=ax[1], node_size=5
+# )
+
+#%% Districtes de Barcelona
+
+bcn_distr = gpd.read_file('/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp', crs="EPSG:4326")
+# f, ax = plt.subplots(figsize=(10,10))
+# bcn_distr.plot(ax = ax, color = "black")
+#%%
+import numpy as np
+import networkx as nx
+from shapely.geometry import Point, LineString
+from shapely.geometry.polygon import Polygon
+import random
+
+nodes_df = gpd.GeoDataFrame({'PointsX': list(np.array(G_primal.nodes)[:,0]), 
+                             'PointsY': list(np.array(G_primal.nodes)[:,1])})
+nodes_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy(nodes_df.PointsX, 
+                                                         nodes_df.PointsY))
+#%%
+nodes_w_distr = gpd.sjoin(nodes_gdf, bcn_distr, how="left" , predicate='within')
+#%%
+f, ax = plt.subplots(figsize=(12, 6))
+nodes_w_distr.plot(color="k", ax=ax)
+#%%
+eixample_df = nodes_w_distr.loc[nodes_w_distr['CODI_UA'] == f"{2:02}"]
+# Construct the primal graph
+eixample = momepy.gdf_to_nx(eixample_df, approach="primal", multigraph = False,
+                            directed = True)
+eixample.remove_edges_from(list(eixample.edges))
+edge_list = []
+for edge in G_primal.edges:
+    if (edge[0] and edge[1]) in eixample.nodes:
+        eixample.add_edge(edge[0], edge[1])
+    
+
+#%%
+f, ax = plt.subplots(figsize=(12, 6))
+nx.draw(eixample, pos = {n: [n[0], n[1]] for n in list(eixample.nodes)},node_size = 2, ax = ax)
+#%%
+pos_to_index = {node: i for (i, node) in enumerate(eixample.nodes)}
+ind_to_pos = {i: node for (i, node) in enumerate(eixample.nodes)}
+eixample = nx.relabel_nodes(eixample, pos_to_index, copy=False)
+#%%
+f, ax = plt.subplots(figsize=(12, 6))
+nx.draw(eixample, pos = ind_to_pos,node_size = 2, ax = ax)
+nx.set_node_attributes(eixample, ind_to_pos, name = 'pos')
+
+#%%
+dists = np.array([np.linalg.norm(np.array(ind_to_pos[edge[1]])-np.array(ind_to_pos[edge[0]])) 
+         for edge in eixample.edges])
+mean_dist =np.mean(dists)
+#%%
+start_time = time.time()
+v = mean_dist/3
+Dt = 15
+n_walk = 1
+walk_eix = node_walkers(eixample, Dt,v,ind_to_pos,n_walk)
+print("--- %s seconds ---" % (time.time() - start_time))
+#%%
+grad_eix, sol_eix, har_eix, pot_eix, div_eix = hodge_decomposition(walk_eix, 'edge_visits')
+#%%
+plot_hodge(walk_eix, grad_eix, sol_eix, har_eix, pot_eix, div_eix , ind_to_pos)
+#%%IMPORTANCE OF EACH COMPONENT
+edge_eix = nx.get_edge_attributes(walk_eix, 'edge_visits')
+w = np.array(list(edge_eix.values()))
+wg = np.array(list(grad_eix.values()))
+ws = np.array(list(sol_eix.values()))
+wh = np.array(list(har_eix.values()))
+weight_g = np.sum(np.square(wg))/np.sum(np.square(w))
+weight_s =np.sum(np.square(ws))/np.sum(np.square(w))
+weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
+
+print(weight_g,weight_s, weight_h, weight_g+weight_s+weight_h)
