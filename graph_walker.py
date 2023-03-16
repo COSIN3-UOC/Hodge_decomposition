@@ -569,60 +569,6 @@ plt.colorbar(sm)
 plt.show()
 
 
-# %%Original triangle finder function
-
-
-def countTriangle(G, isDirected):
-
-    g = nx.adjacency_matrix(G).toarray()
-    nodes = len(g)
-    count_Triangle = 0
-    triangles = {}
-   	# Consider every possible
-   	# triplet of edges in graph
-    for i in range(nodes):
-        for j in range(nodes):
-            for k in range(nodes):
-
-				# check the triplet
-				# if it satisfies the condition
-                if (i != j and i != k and j != k and ((i, j) in G.edges or (j, i)
-                    in G.edges) and ((j, k) in G.edges or (k, j) in G.edges)
-                    and ((i, k) in G.edges or (k, i) in G.edges)):
-
-                    if (i, j) in G.edges:
-                        i1 = (i, j)
-                    elif (j, i) in G.edges:
-                        i1 = (j, i)
-
-                    if (j, k) in G.edges:
-                        i2 = (j, k)
-                    elif (k, j) in G.edges:
-                        i2 = (k, j)
-
-                    if (i, k) in G.edges:
-                        i3 = (i, k)
-                    elif (k, i) in G.edges:
-                        i3 = (k, i)
-                        # print(list(permutations([i1, i2, i3])))
-                    for tri in permutations([i1, i2, i3]):
-                        if list(tri) in triangles.values():
-                            rep = True
-                            break
-                        else:
-                            rep = False
-                    if rep == False:
-                        x = list(set(i1+i2+i3))
-                        triangles[tuple(sorted(x))]\
-                            = [i1, i2, i3]
-                        count_Triangle += 1
-	# If graph is directed , division is done by 3
-	# else division by 6 is done
-    if isDirected:
-        return count_Triangle, triangles
-    else:
-        print('Error: Graph is not directed')
-
 # %% ALTERNATIVE WAY TO FND TRIANGLES (faster)
 
 
@@ -1563,7 +1509,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
                             # vmax=vmax_div)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_p,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5)
+                           arrowsize = 5, node_size = 1)
 
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
@@ -1598,7 +1544,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
                             vmin=vmin_pot, vmax=vmax_pot)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_g,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax, 
-                           arrowsize = 5)
+                           arrowsize = 5, node_size = 1)
 
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
@@ -1625,7 +1571,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
                            node_color='#D3D3D3')
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_s,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5)
+                           arrowsize = 5, node_size = 1)
 
 
     sm = plt.cm.ScalarMappable(
@@ -1647,7 +1593,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
                            node_color='#D3D3D3')
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_h,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5)
+                           arrowsize = 5, node_size = 1)
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
@@ -1818,10 +1764,6 @@ def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     ind_to_pos = {nodes_w_distr.loc[i,'uid']:(nodes_w_distr.loc[i,'geometry'].x,
                                           nodes_w_distr.loc[i,'geometry'].y) for i in 
                   range(len(nodes_w_distr))}
-    pos_to_index = {(nodes_w_distr.loc[i,'geometry'].x, 
-                     nodes_w_distr.loc[i,'geometry'].y):nodes_w_distr.loc[i,'uid']
-                    for i in range(len(nodes_w_distr))}
-    #nx.set_node_attributes(bcn_graph, ind_to_pos, 'pos')
 
     for edge in bcn_edges['to_from']:
         sep = edge.split(',')
@@ -1942,7 +1884,7 @@ dists = np.array([np.linalg.norm(np.array(ind_to_pos[edge[1]])-np.array(ind_to_p
 
 plt.xlim(0,100)
 plt.hist(dists, bins = 100,range=(0,100))
-print(min(a_dists))
+print(min(dists))
 #%%
 
 st_ratio_g, st_ratio_s, st_ratio_h = structural_ratios(cv)
@@ -1951,8 +1893,8 @@ print(st_ratio_g, st_ratio_s, st_ratio_h)
 #%%
 mean_dist = np.mean(dists)
 start_time = time.time()
-v = mean_dist/3
-Dt = 120
+v = 1.42
+Dt = 15*60
 n_walk = 20
 walk_cv = node_walkers(cv, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
@@ -1991,7 +1933,10 @@ plt.title(r'$\mu=%.3f,\ \sigma=%.3f$' %(mu, sigma))
 
 #%%
 pot_field = np.array(list(pot_cv.values()))
-plt.hist(pot_field, bins = 50)
+#plot
+plt.xlabel('Node potential')
+plt.ylabel('Frequency')
+plt.hist(pot_field, bins = 50, edgecolor ='black')
 
 #%%
 plot_hodge(walk_cv, grad_cv, sol_cv, har_cv, pot_cv, div_cv, ind_to_pos)
@@ -2016,6 +1961,8 @@ plt.hlines(st_ratio_h*100, 0, 120, color = 'r', linestyle = '--', label = 'harmo
 plt.xlabel('Simulation time')
 plt.ylabel('strength ratio')
 plt.legend()
+
+
 #%% SANTS MONTJUÏC
 '''SANTS - MONTJUÏC'''
 distr_ind = 3
