@@ -17,12 +17,9 @@ from contextily import add_basemap
 import momepy
 import pandas as pd
 import geopandas as gpd
-import math
 import scipy
 from sympy import LeviCivita
 from itertools import combinations, permutations
-import EoN
-import operator
 from scipy.spatial import Delaunay
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -43,21 +40,22 @@ to the nodes
 def digraph_walkers(G, steps, n_walk):
 
     # let's add a list of n_walk random walkers
-    overall_node_weights = {node: 0 for node in list(G.nodes)}
+    # overall_node_weights = {node: 0 for node in list(G.nodes)}
     overall_edge_weights = {edge: 0 for edge in list(G.edges)}
     for i in range(0, n_walk):
-        path = []
+        print('realisation '+str(i+1)+'/'+str(n_walk))
+        # path = []
         initial_nodes = list(G.nodes)
         # initial_nodes += initial_nodes
         # path stores the position of each walker in each time step
-        path.append(initial_nodes)
+        # path.append(initial_nodes)
         # weights counts the amount of times a walker has visited each node
-        weights = {i_node: path[0].count(i_node) for i_node in list(G.nodes)}
+        # weights = {i_node: path[0].count(i_node) for i_node in list(G.nodes)}
         edge_weights = {i_edge: 0 for i_edge in list(G.edges)}
         # now, let's move the walker to a connected node
         # first let's see the available nodes to go to
         for step in range(steps):
-            print(step)
+            # print(step)
             # list of neighboring nodes (successors) of each walker
             neighbors = [[n for n in (list(G.neighbors(walker)) +
                                       list(G.predecessors(walker)))]
@@ -66,7 +64,7 @@ def digraph_walkers(G, steps, n_walk):
             final_nodes = [random.choice(goto_nodes)
                                          for goto_nodes in neighbors]
 
-            path.append(final_nodes)
+            # path.append(final_nodes)
 
             # counting edge visits according to direction of edge
             for node_i, node_f in zip(initial_nodes, final_nodes):
@@ -76,18 +74,18 @@ def digraph_walkers(G, steps, n_walk):
                     else:
                         edge_weights[(node_f, node_i)] -= 1
             # count the occutpation of each node after the moves
-            for node_i, node_f in zip(initial_nodes, final_nodes):
-                if node_i != node_f:
-                    weights[node_i] += 1
+            # for node_i, node_f in zip(initial_nodes, final_nodes):
+            #     if node_i != node_f:
+            #         weights[node_i] += 1
 
             initial_nodes = final_nodes
         for edge in G.edges:
             overall_edge_weights[edge] += edge_weights[edge]
-        for node in G.nodes:
-            overall_node_weights[node] += weights[node]
+        # for node in G.nodes:
+        #     overall_node_weights[node] += weights[node]
         # set node value as the number of visits of each value
         # print(weights)
-    nx.set_node_attributes(G, overall_node_weights, name='weights')
+    # nx.set_node_attributes(G, overall_node_weights, name='weights')
     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
     return(G)
 # %% ABSORBING RANDOM WALK ON A DIRECTED GRAPH (walk during amount of steps)
@@ -102,7 +100,7 @@ the source-target pairs are considered.
 '''
 
 
-def absorbing_walkers(G):
+def absorbing_walkers(G, n_walk):
 
     # let's add a list of n_walk random walkers
     # overall_node_weights = {node: 0 for node in list(G.nodes)}
@@ -111,45 +109,45 @@ def absorbing_walkers(G):
 #    target is the absorbing node
     for target in sorted(list(G.nodes)):
         print('target '+str(target)+'/'+str(total_nodes-1))
-        # path = []
-#        taking the initial nodes such that target>source to avoud repetitions
-        initial_nodes = [node for node in G.nodes if node<target]
-        # initial_nodes += initial_nodes
-        # path stores the position of each walker in each time step
-        #path.append(initial_nodes)
-        # weights counts the amount of times a walker has visited each node
-        #weights = {i_node: path[0].count(i_node) for i_node in list(G.nodes)}
-        edge_weights = {i_edge: 0 for i_edge in G.edges}
-        # now, let's move the walker to a connected node
-        # first let's see the available nodes to go to
-        while len(initial_nodes)!=0:
-            # list of neighboring nodes (successors) of each walker
-            neighbors = [[n for n in (list(G.neighbors(walker)) +
-                                      list(G.predecessors(walker)))]
-                         for walker in initial_nodes]
-            # now move the random walker to another node
-            final_nodes = [random.choice(goto_nodes)
-                                         for goto_nodes in neighbors]
-
-            #path.append(final_nodes)
-
-            # counting edge visits according to direction of edge
-            for node_i, node_f in zip(initial_nodes, final_nodes):
-                if node_i != node_f:
-                    if (node_i, node_f) in list(G.edges):
-                        edge_weights[(node_i, node_f)] += 1
-                    else:
-                        edge_weights[(node_f, node_i)] -= 1
-            # count the occutpation of each node after the moves
-            # for node_i, node_f in zip(initial_nodes, final_nodes):
-            #     if node_i != node_f:
-            #         weights[node_i] += 1
-#           checking if the walkers reached the target
-            if target in final_nodes:
-                final_nodes.remove(target)
-            initial_nodes = final_nodes
-        for edge in G.edges:
-            overall_edge_weights[edge] += edge_weights[edge]
+        for w in range(n_walk):
+    #        taking the initial nodes such that target>source to avoud repetitions
+            initial_nodes = [node for node in G.nodes if node<target]
+            # initial_nodes += initial_nodes
+            # path stores the position of each walker in each time step
+            #path.append(initial_nodes)
+            # weights counts the amount of times a walker has visited each node
+            #weights = {i_node: path[0].count(i_node) for i_node in list(G.nodes)}
+            edge_weights = {i_edge: 0 for i_edge in G.edges}
+            # now, let's move the walker to a connected node
+            # first let's see the available nodes to go to
+            while len(initial_nodes)!=0:
+                # list of neighboring nodes (successors) of each walker
+                neighbors = [[n for n in (list(G.neighbors(walker)) +
+                                          list(G.predecessors(walker)))]
+                             for walker in initial_nodes]
+                # now move the random walker to another node
+                final_nodes = [random.choice(goto_nodes)
+                                             for goto_nodes in neighbors]
+    
+                #path.append(final_nodes)
+    
+                # counting edge visits according to direction of edge
+                for node_i, node_f in zip(initial_nodes, final_nodes):
+                    if node_i != node_f:
+                        if (node_i, node_f) in list(G.edges):
+                            edge_weights[(node_i, node_f)] += 1
+                        else:
+                            edge_weights[(node_f, node_i)] -= 1
+                # count the occutpation of each node after the moves
+                # for node_i, node_f in zip(initial_nodes, final_nodes):
+                #     if node_i != node_f:
+                #         weights[node_i] += 1
+    #           checking if the walkers reached the target
+                if target in final_nodes:
+                    final_nodes.remove(target)
+                initial_nodes = final_nodes
+            for edge in G.edges:
+                overall_edge_weights[edge] += edge_weights[edge]/n_walk
         # for node in G.nodes:
         #     overall_node_weights[node] += weights[node]
         # set node value as the number of visits of each value
@@ -251,12 +249,22 @@ def node_walkers(G, Dt, v, pos, n_walk):
     return(G)  # MSD_dict)
 
 #%%
-def periodic_walkers(G, Dt, v, pos, n_walk):
+''' This funciton moves n_walk random walkers from each node in the graph 
+during a time Dt in a periodic boundary condition square lattice.
+
+G: an nx.DiGraph
+Dt: total simulation time
+v: velocity of the walker
+pos: dictionary with node_id:position of the node
+N: number of nodes of the original square lattice
+follow_node: int, id of the node to follow the trajectory
+'''
+def periodic_walkers(G, Dt, v, pos, n_walk, N, follow_node):
     # calculating the time intrinsec to each edge
     delta_t = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
-            for edge in PBC_lattice.edges}
-
-    lattice_gap = min(delta_t.values())
+            for edge in G.edges}
+    path_tot = []
+    lattice_gap = 1
     for i in range(N):
         delta_t[(i, i+N*N-N)] = lattice_gap
     #    print((i, i+N*N-N) in list(PBC_lattice.edges))
@@ -269,7 +277,6 @@ def periodic_walkers(G, Dt, v, pos, n_walk):
     nx.set_edge_attributes(G, delta_t, name='dt')
     # upper bound for steps
     min_edge_time = min(delta_t.values())
-    Dt = Dt
     max_steps = int(Dt/min_edge_time)
     print('maximum steps allowed each realisation', max_steps)
     # overall_edge_weights account for all the edge passings summed for
@@ -277,10 +284,11 @@ def periodic_walkers(G, Dt, v, pos, n_walk):
     # MSD_dict = {i:[] for i in G.nodes}
     overall_edge_weights = {edge: 0 for edge in list(G.edges)}
     for i in range(0, n_walk):
+        path = []
         print('realisation '+str(i+1)+'/'+str(n_walk))
         # dictionary of walker index:current_node the walker is in
         pos_walkers = {i: i for i in G.nodes}
-
+        path.append(pos_walkers[follow_node])
         # edge_weights counts the amount of times a walker has visited
         # each edge in 1 realisation
         edge_weights = {i_edge: 0 for i_edge in list(G.edges)}
@@ -318,7 +326,7 @@ def periodic_walkers(G, Dt, v, pos, n_walk):
                     if time[walker] + goto_nodes[sel]>Dt:
                         # desactivate the walker that has finished
                         active_walkers[walker] = False
-                        print(Counter(active_walkers.values()))
+                        # print(Counter(active_walkers.values()))
                         continue
                     # updating edge flow dict
                     if (pos_walkers[walker], sel) in list(G.edges):
@@ -335,11 +343,13 @@ def periodic_walkers(G, Dt, v, pos, n_walk):
                 else:
                     # desactivate the walker that has finished
                     active_walkers[walker] = False
-                    print(Counter(active_walkers.values()))
+                    # print(Counter(active_walkers.values()))
+            path.append(pos_walkers[follow_node])
+        path_tot.append(path)
         for edge in G.edges:
             overall_edge_weights[edge] += edge_weights[edge]
     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
-    return(G)  # MSD_dict)
+    return(G, path_tot)  # MSD_dict)
 # %% ALTERNATIVE WAY TO FND TRIANGLES (faster)
 
 
@@ -571,25 +581,28 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     plt.subplot(221)
     plt.title('Original Graph 100%')
 
-    color_p = np.abs(np.array(list(edge_graph.values())))
-    colors = np.linspace(0, percentile)
-    cmap = plt.cm.Oranges
+    # color_p = np.abs(np.array(list(edge_graph.values())))
+    color_p = np.array(list(edge_graph.values()))
+    # colors = np.linspace(0, percentile)
+    # cmap = plt.cm.Oranges
+    colors = np.linspace(-percentile, percentile)
+    cmap = plt.cm.seismic
     vmin = min(colors)
     vmax = max(colors)
 
-    # color_div = list(deg_dict.values())
+    # color_div = list(div.values())
     # colors_div = range(int(min(color_div)), int(max(color_div)))
-    # cmap_div = plt.cm.bone_r
+    # cmap_div = plt.cm.RdBu_r
     # vmin_div = min(colors_div)
-    # vmax_div = max(colors_div)
+    # vmax_div = round(max(color_div))
 
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=1, 
-                           node_color='#D3D3D3'),
+    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4, 
+                           node_color='#D3D3D3')
                             # node_color=color_div, cmap=cmap_div, vmin=vmin_div,
                             # vmax=vmax_div)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_p,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 1)
+                           arrowsize = 5, node_size = 4)
 
     sm = plt.cm.ScalarMappable(cmap=cmap, 
                                norm=plt.Normalize(vmin=vmin, vmax=vmax))
@@ -601,7 +614,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     #                                                               vmax=vmax_div))
     # sm2._A = []
     # cbar2 = plt.colorbar(sm2, location='right')
-    # cbar2.set_label(r'Node degree')
+    # cbar2.set_label(r'Node div')
 
     plt.subplot(222)
     color_g = np.abs(np.array(list(grad_comp.values())))
@@ -610,21 +623,20 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     color_pot = list(pot.values())
     colors_pot = range(-int(max(color_pot)), int(max(color_pot)))
     cmap_pot = plt.cm.PRGn
-    vmin_pot = np.min(colors_pot)
-    vmax_pot = np.max(colors_pot)
+    vmin_pot = np.min(color_pot)
+    vmax_pot = np.max(color_pot)
 
-    color_p = np.array(list(edge_graph.values()))
     colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
     plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%')
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None,
-                            node_size=1, node_color=color_pot, cmap=cmap_pot,
+                            node_size=8, node_color=color_pot, cmap=cmap_pot,
                             vmin=vmin_pot, vmax=vmax_pot)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_g,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax, 
-                           arrowsize = 5, node_size = 1)
+                           arrowsize = 5, node_size = 8)
 
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
@@ -638,7 +650,6 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     cbar2 = plt.colorbar(sm2, location='right')
     cbar2.set_label(r'Node potentials')
 
-    color_p = np.abs(np.array(list(edge_graph.values())))
     colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
@@ -647,11 +658,11 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     color_s = np.abs(np.array(list(sol_comp.values())))
     plt.subplot(223)
     plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=1,
+    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
                            node_color='#D3D3D3')
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_s,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 1)
+                           arrowsize = 5, node_size = 4)
 
 
     sm = plt.cm.ScalarMappable(
@@ -660,7 +671,6 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     cbar = plt.colorbar(sm)
     cbar.set_label(r'$\left|\omega_s\right|$')
 
-    color_p = np.abs(np.array(list(edge_graph.values())))
     colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
@@ -669,11 +679,11 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     color_h = np.array(list(har_comp.values()))
     plt.subplot(224)
     plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=1,
+    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
                            node_color='#D3D3D3')
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_h,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 1)
+                           arrowsize = 5, node_size = 4)
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
@@ -923,29 +933,6 @@ plt.hlines(st_ratio_h*100, 0, 35, color = 'r', linestyle = '--', label = 'harmon
 plt.xlabel('Simulation time')
 plt.ylabel('strength ratio')
 plt.legend()
-
-#%% building the transition rate matrix
-#dict of matrix ind to node index
-inode_to_iarr = {node:i for i, node in enumerate(cv.nodes)}
-#building the array
-trans_rates = np.zeros((len(cv.edges)+1, len(cv.edges)+1))
-for node in cv.nodes:
-    k = len(list(cv.neighbors(node)))
-    for final in cv.neighbors(node):
-        i, j = inode_to_iarr[node], inode_to_iarr[final]
-        dist = np.linalg.norm(np.array(ind_to_pos[node])-np.array(ind_to_pos[final]))
-        trans_rates[i][j+1] =v/(k*dist)
-# the diagonal is -sum of the off diag elements of the row
-i,j = np.indices(trans_rates.shape)
-diagonal = np.sum(trans_rates, axis=1)
-trans_rates[i==j] = -diagonal
-#%%
-#finding the eigenvecs and eigenvals
-eigval, eigvecs = scipy.linalg.eig(trans_rates)
-#%%
-print(eigvecs[np.where(np.imag(eigvecs) != 0)])
-print(np.where(np.real(eigval) == 0))
-stationary_node_prob = np.real(eigvecs)[:,np.where(np.real(eigval) == 0)[0]]
 
 #%% discrete walk
 start_time = time.time()
@@ -1382,12 +1369,78 @@ with open('st_mart_dec.txt', 'r', newline='\n') as file:
         dict_ls.append(eval(i))
 file.close()
 
-#%%Lattice graph pbc
-
-N = 10
+#%%BUILDING A LATTICE GRAPH WITH PERIODIC BOUNDARY CONDITIONS AND ADDING NODES
+#AT THE CENTRE
+N = 8
 PBC_lattice =nx.grid_2d_graph(N,N,periodic=True)
-pos = {i * N + j:(i, j) for i, j in PBC_lattice.nodes()}
-labels = dict( ((i, j), i * N + j) for i, j in PBC_lattice.nodes() )
+new_edges = []
+# Define the vertices of the original square
+A = (3, 3)
+B = (3, 4)
+C = (4, 4)
+D = (4, 3)
+
+# Define the number of iterations (i.e., how many times to divide each square into four smaller squares)
+num_iterations = 2
+
+# Initialize the list of squares to divide with the original square
+squares_to_divide = [(A, B, C, D)]
+
+# Iterate through the specified number of iterations
+for iteration in range(num_iterations):
+    new_squares = []
+    # Divide each square in the current list into four smaller squares
+    for square in squares_to_divide:
+        # Find the midpoints of each side of the square
+        AB_midpoint = ((square[0][0] + square[1][0]) / 2, (square[0][1] + square[1][1]) / 2)
+        BC_midpoint = ((square[1][0] + square[2][0]) / 2, (square[1][1] + square[2][1]) / 2)
+        CD_midpoint = ((square[2][0] + square[3][0]) / 2, (square[2][1] + square[3][1]) / 2)
+        DA_midpoint = ((square[3][0] + square[0][0]) / 2, (square[3][1] + square[0][1]) / 2)
+
+        # Find the midpoint of the square
+        square_midpoint = ((square[0][0] + square[2][0]) / 2, (square[0][1] + square[2][1]) / 2)
+
+        # Find the midpoint of the diagonal of the square
+        diagonal_midpoint = ((square[0][0] + square[2][0]) / 2, (square[1][1] + square[3][1]) / 2)
+
+        # Define the four smaller squares
+        square_1 = (square[0], AB_midpoint, square_midpoint, DA_midpoint)
+        square_2 = (AB_midpoint, square[1], BC_midpoint, square_midpoint)
+        square_3 = (square_midpoint, BC_midpoint, square[2], CD_midpoint)
+        square_4 = (DA_midpoint, square_midpoint, CD_midpoint, square[3])
+
+        # Add the four smaller squares to the list of new squares
+        new_squares.extend([square_1, square_2, square_3, square_4])
+
+    # Update the list of squares to divide with the new list of smaller squares
+    squares_to_divide = new_squares
+
+# Find the vertexes of the final squares excluding the ones from the original square
+new_vertexes = []
+for square in squares_to_divide:
+    for vertex in square:
+        if vertex not in [A, B, C, D] and vertex not in new_vertexes:
+            new_vertexes.append(vertex)
+
+# Print the new vertexes
+print(new_vertexes)
+
+
+#%%ADDING THE NEW EDGES TO THE GRAPH
+for i in range(0, 4):
+    new_edges += [((4,3+i/4), (4, 3+(i+1)/4))]
+    new_edges += [((3+i/4,4), (3+(i+1)/4, 4))]
+    for j in range(0, 4):
+        new_edges += [((3+i/4, 3+j/4), (3+i/4, 3+(j+1)/4)), ((3+i/4, 3+j/4), (3+(i+1)/4, 3+j/4)), 
+                      ((3+i/4, 3+j/4), (3+(i+1)/4, 3+(j+1)/4)), (((3+i/4, 3+(j+1)/4)), (3+(i+1)/4, 3+j/4))]
+PBC_lattice.remove_edges_from([((3,3),(3,4)), ((3, 3), (4,3)), ((3,4), (4,4)),
+                               ((4,3), (4,4))])
+PBC_lattice.add_nodes_from(new_vertexes)
+PBC_lattice.add_edges_from(new_edges)
+#pos = {i * N + j:(i, j) for i, j in PBC_lattice.nodes()}
+pos = {i: j for i,j in enumerate(PBC_lattice.nodes)}
+#labels = dict( ((i, j), i * N + j) for i, j in PBC_lattice.nodes() )
+labels = {i: k for k, i in enumerate(PBC_lattice.nodes)}
 nx.relabel_nodes(PBC_lattice, labels, copy=False)
 
 PBC_lattice = nx.DiGraph(PBC_lattice)
@@ -1395,31 +1448,71 @@ out_edges = [edge for edge in PBC_lattice.edges if edge[0]
     > edge[1]]  # removing all outward edges
 PBC_lattice.remove_edges_from(out_edges)
 nx.draw_networkx(PBC_lattice, pos=pos, with_labels=True, node_size = 10)
-#%%
+#%% PERIODIC BOUNDARY CONDITIONS CONTINUOUS RANDOM WALK
 v = 1
-Dt = 7
+Dt = 20
 # for Dt in range(95,105, 5):
-n_walk = 1000
-walked_PBC = periodic_walkers(PBC_lattice, Dt, v, pos, n_walk)
+n_walk = 20
+follow_node = 69
+walked_PBC, path = periodic_walkers(PBC_lattice, Dt, v, pos, n_walk, N, follow_node)
 
 grad, sol, har, pot, div = hodge_decomposition(
     walked_PBC, 'edge_visits')
-
+print(structural_ratios(PBC_lattice))
 plot_hodge(walked_PBC, grad, sol, har, pot, div, pos)
+#%%
+for k in range(n_walk):
+    plt.figure()
+    path_edges = [(path[k][i],path[k][i+1])  if path[k][i]<path[k][i+1] else
+                  (path[k][i+1],path[k][i]) for i in range(len(path[k])-1)]
+    edge_color_list = ['red' if edge in path_edges
+                       else (210/255, 210/255, 210/255, 0.2) for edge in PBC_lattice.edges]
+    final_nodes = [path[i][-1] for i, j in enumerate(path)]
+    node_color_list = ['orange' if node in final_nodes else 'blue' for node in PBC_lattice.nodes]
+    nx.draw_networkx(PBC_lattice, pos=pos, with_labels=True, node_size = 10, 
+                      edge_color = edge_color_list, node_color=node_color_list)
+    plt.title('Final nodes for node '+str(follow_node))
+    plt.tight_layout()
+print(structural_ratios(PBC_lattice))
+#%%
+n_w_ls = np.array([10, 20, 30, 40, 50, 100])*len(list(PBC_lattice.nodes))
+grad_pc = [14.1, 23.6, 33.7, 37.4, 39.4, 58.4]
+
+plt.figure()
+plt.plot(n_w_ls, grad_pc, '.-')
+plt.xlabel('total number of walkers')
+plt.ylabel('gradient component (%)')
+plt.title('Periodic random walk for Dt  = 15')
+plt.tight_layout()
 
 #%% absorbing walk on a lattice
 
-walk_abs = absorbing_walkers(PBC_lattice)
+walk_abs = absorbing_walkers(PBC_lattice, 20)
 grad, sol, har, pot, div = hodge_decomposition(
     walk_abs, 'edge_visits')
 
 plot_hodge(walk_abs, grad, sol, har, pot, div, pos)
-print(structural_ratios(PBC_lattice))
 
-#%%
-#1 constructing D-A
+
+#%%NEWMANN BETWENNESS FUNCTION
 
 def newman_bet(A:np.array,lap:np.array):
+    '''
+    
+
+    Parameters
+    ----------
+    A : np.array
+        Adjacency matrix of the graph.
+    lap : np.array
+        Graph laplacian.
+
+    Returns
+    -------
+    rw_edge_betw: array of edge flows according to Newmann's RW betweenness.
+
+    '''
+    #1 constructing D-A
     n = len(A)
     #rw_node_betw = np.zeros(n)
     rw_edge_btw = np.zeros(np.shape(lap))
@@ -1446,13 +1539,13 @@ def newman_bet(A:np.array,lap:np.array):
     # rw_edge_btw *= const
     # rw_node_betw *= const
     return(rw_edge_btw)#, rw_node_betw)
-#%%
+#%% running newmann
 start_time = time.time()
 A = nx.adjacency_matrix(nx.to_undirected(PBC_lattice), nodelist= sorted(PBC_lattice.nodes)).toarray()
 lap = nx.laplacian_matrix(nx.to_undirected(PBC_lattice), nodelist= sorted(PBC_lattice.nodes)).toarray()
 rw_edge_btw = newman_bet(A, lap)
 print("--- %s seconds ---" % (time.time() - start_time))
-#%%
+#%% plot newmann
 n = len(A)
 # const = (0.5*n*(n-1))
 # rw_edge_btw *= const
@@ -1465,14 +1558,11 @@ grad_PBC, sol_PBC, har_PBC, pot_PBC, div_PBC = hodge_decomposition(
     PBC_lattice, 'edge_visits')
 print(pot_PBC)
 plot_hodge(PBC_lattice, grad_PBC, sol_PBC, har_PBC, pot_PBC, div_PBC, pos)
-#%%
-print(pot_PBC)
-print(pot)
 #%% Let's see if the gradient component is always the same and see the fluctuations
 boxpl_ls_g = []
 boxpl_ls_h = []
 for i in range(5):
-    walk_abs = absorbing_walkers(PBC_lattice)
+    walk_abs = absorbing_walkers(PBC_lattice, 50)
     grad, sol, har, pot, div = hodge_decomposition(
         walk_abs, 'edge_visits')
 
@@ -1491,3 +1581,279 @@ plt.ylabel('Edge discrepancy from predicted component')
 A = nx.adjacency_matrix(nx.to_undirected(cv), nodelist= sorted(cv.nodes)).toarray()
 lap = nx.laplacian_matrix(nx.to_undirected(cv), nodelist= sorted(cv.nodes)).toarray()
 rw_edge_btw, rw_node_betw = newman_bet(A, lap)
+
+#%% CONTINUUM NEWMANN WITHOUT ABSORBINGS
+
+'''first we build the transition rates matrix'''
+
+# building the transition rate matrix
+#dict of matrix ind to node index
+PBC_und = PBC_lattice.to_undirected()
+
+#distances of the edges in the graph
+dists = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))
+        for edge in PBC_und.edges}
+path_tot = []
+lattice_gap = 1
+for i in range(N):
+    dists[(i, i+N*N-N)] = lattice_gap
+    dists[(i+N*N-N, i)] = lattice_gap
+    if i==0:
+        dists[(i,i+N-1)] = lattice_gap 
+        dists[(i+N-1, i)] = lattice_gap 
+    else:
+        dists[(i*N, i*N+N-1)] = lattice_gap
+        dists[(i*N+N-1, i*N)] = lattice_gap
+
+#mapping of each node to its index in the transition rate array
+inode_to_iarr = {node:i for i, node in enumerate(PBC_und.nodes)}
+iarr_to_inode = {inode_to_iarr[i]:i for i in inode_to_iarr.keys()}
+#building the array
+trans_rates = np.zeros((len(PBC_und.nodes), len(PBC_und.nodes)))
+for node in PBC_und.nodes:
+    #Degree of the departure node
+    k = len(list(PBC_und.neighbors(node)))
+    # k = np.sum(np.array([dists[(node, neigh)] if (node, neigh) in list(PBC_und.edges)
+                         # else dists[(neigh, node)]
+                         # for neigh in PBC_und.neighbors(node)]))
+                         
+    #for each neighbour we calculate the transition rate probability of going 
+    #from node to final as v/(dist*k)
+    for final in PBC_und.neighbors(node):
+        i, j = inode_to_iarr[node], inode_to_iarr[final]
+        dist = np.linalg.norm(np.array(pos[final])-np.array(pos[node]))
+        trans_rates[i][j] = v/(k*dist)
+        # trans_rates[i][j] = 1/k
+# the diagonal is -sum of the off diag elements of the col
+i,j = np.indices(trans_rates.shape)
+diagonal = np.sum(trans_rates, axis=0)
+trans_rates[i==j] = -diagonal
+#%% FINDING THE EIGENVECS AND EIGENVALS. The eigenvector with eigenvalue 1 is 
+#the stationary state in theory
+eigval, eigvecs = scipy.linalg.eig(np.transpose(trans_rates))
+#%%
+print(np.where(np.real(np.round(eigval, 5)) == 0))
+stationary_node_prob = np.real(eigvecs)[:,np.where(np.real(np.round(eigval, 2)) == 0)[0]]
+print(Counter(np.transpose(stationary_node_prob)[0]))
+#%% SYSTEM OF ODES
+from scipy.integrate import odeint
+v=1
+def dp_dt(p, t, R, dummy):
+    '''
+
+    Parameters
+    ----------
+    p : np.array
+        Array of probabilities of being at each node at time t.
+    t : np.array
+        Array (linspace) of integration times.
+    R : np.array
+        Transition rates matrix, each coefficient of the differential equations.
+    dummy : None
+        dummy vvariable for the odeint to work.
+
+    Returns
+    -------
+    dy: dp.
+
+    '''
+    dy = R.dot(p)
+    return(dy)
+#array of flows through the edges
+net_flow = np.zeros(np.shape(trans_rates))
+#initial probabilities
+p0 = np.zeros(len(PBC_lattice.nodes))
+for initial in range(len(p0)):
+    p0 = np.zeros(len(PBC_lattice.nodes))
+    p0[initial] = 1
+    
+    t = np.linspace(start=0, stop=20,num=20000)
+    sol = odeint(func=dp_dt, y0=p0, t=t, args = (trans_rates, None))
+    
+    #INTEGRATION
+    #The transition rates are constant, thus the integral (p_i*R_{ij} - p_j*R_{ji}) can
+    #be computed by first integrating the p's and then doing the calculations
+    flows = np.trapz(sol, t, axis=0)
+    
+    for j, p_j in enumerate(flows):
+        
+        for i in range(len(PBC_lattice.nodes)):
+            net_flow[i,j] -= p_j*trans_rates[i][j] - flows[i]*trans_rates[j][i]
+
+net_flow*= 20
+cont_new = {edge: net_flow[inode_to_iarr[edge[0]]][inode_to_iarr[edge[1]]] 
+            for edge in PBC_lattice.edges}
+nx.set_edge_attributes(PBC_lattice, cont_new, name = 'edge_visits')
+#%%
+g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new = \
+hodge_decomposition(PBC_lattice, 'edge_visits')
+#pot_cont_new = {iarr_to_inode[i]: prob for i, prob in enumerate(sol[-1][:])}
+plot_hodge(PBC_lattice, g_cont_new, s_cont_new, h_cont_new, pot_cont_new, 
+           div_cont_new, pos)
+#%%
+plt.figure()
+sol = pd.DataFrame(sol)
+for i in range(len(PBC_lattice.nodes)):
+    plt.plot(t,sol[i])
+plt.show()
+print(8/(2*len(list(PBC_lattice.edges))))
+#%%
+for i in pot.keys():
+    print(pot[i], pot_cont_new[i])
+    
+#%% WHAT HAPPENS IF WE PERFORM A DISCRETE RW
+
+Dt = 200
+# for Dt in range(95,105, 5):
+n_walk = 20
+
+walked_PBC_discr = digraph_walkers(PBC_lattice, Dt, n_walk)
+
+grad, sol, har, pot, div = hodge_decomposition(
+    walked_PBC_discr, 'edge_visits')
+
+plot_hodge(walked_PBC_discr, grad, sol, har, pot, div, pos)   
+#%% NEWMANN RNADOM WALK BETWEENNESS USING NX INTEGRATED FUNCTION
+edge_rw_centr = nx.edge_current_flow_betweenness_centrality(nx.to_undirected(PBC_lattice), 
+                                                            normalized=False)
+
+for edge in PBC_lattice.edges:
+    if edge not in list(edge_rw_centr.keys()):
+        edge_rw_centr[edge] = edge_rw_centr[(edge[1],edge[0])]
+        del edge_rw_centr[(edge[1],edge[0])]
+
+# for edge in edge_rw_centr.keys():
+#     edge_rw_centr[edge] *= 200
+
+nx.set_edge_attributes(PBC_lattice, edge_rw_centr, name = 'edge_visits')
+
+grad, sol, har, pot, div = hodge_decomposition(
+    PBC_lattice, 'edge_visits')
+
+plot_hodge(PBC_lattice, grad, sol, har, pot, div, pos)   
+#%%
+
+edge_rw_centr = nx.edge_current_flow_betweenness_centrality(nx.to_undirected(cv), 
+                                                            normalized=False)
+
+for edge in cv.edges:
+    if edge not in list(edge_rw_centr.keys()):
+        edge_rw_centr[edge] = -edge_rw_centr[(edge[1],edge[0])]
+        del edge_rw_centr[(edge[1],edge[0])]
+
+# for edge in edge_rw_centr.keys():
+#     edge_rw_centr[edge] *= 200
+
+nx.set_edge_attributes(cv, edge_rw_centr, name = 'edge_visits')
+
+grad, sol, har, pot, div = hodge_decomposition(
+    cv, 'edge_visits')
+
+plot_hodge(cv, grad, sol, har, pot, div, ind_to_pos)  
+#%%DISCRETE NON ABSORBING NEWMANN: ANALYTIC DISCRETE RW
+
+''' first we build the transition matrix'''
+# building the transition rate matrix
+#dict of matrix ind to node index
+PBC_und = PBC_lattice.to_undirected()
+deg_arr = []
+#mapping of each node to its index in the transition rate array
+inode_to_iarr = {node:i for i, node in enumerate(PBC_und.nodes)}
+iarr_to_inode = {inode_to_iarr[i]:i for i in inode_to_iarr.keys()}
+#building the array
+trans_matrix = np.zeros((len(PBC_und.nodes), len(PBC_und.nodes)))
+for node in PBC_und.nodes:
+    #Degree of the departure node
+    k = len(list(PBC_und.neighbors(node)))
+    deg_arr.append(1/k)
+    #for each neighbour we calculate the transition rate probability of going 
+    #from node to final as v/(dist*k)
+    for final in PBC_und.neighbors(node):
+        i, j = inode_to_iarr[node], inode_to_iarr[final]
+        trans_matrix[j][i] = 1/k
+deg_arr = np.array(deg_arr)
+#%% raising the array to the amount of steps
+steps = 200
+edge_discr_flow = dict.fromkeys(PBC_lattice.edges, 0)
+trans_probabilities = np.zeros(np.shape(trans_matrix))
+for n in range(0, steps):
+# the probability of starting at i and endng at j after n steps is each element 
+# of this matrix
+    trans_probabilities += np.linalg.matrix_power(trans_matrix, n)
+#now we sum all the probabilities of finishing at node j and multiply this value
+# by the degree of j in order to find the expected value of transitions from j 
+#to i at step t
+visit_prob = trans_probabilities.dot(np.ones_like(deg_arr))
+probs = np.copy(visit_prob)
+prob_node = {iarr_to_inode[i]: prob for i, prob in enumerate(probs)}
+visit_prob *= deg_arr
+for edge in PBC_lattice.edges:
+    i, j = inode_to_iarr[edge[0]], inode_to_iarr[edge[1]]
+    edge_discr_flow[edge] -= (visit_prob[j] - visit_prob[i])*20
+        
+nx.set_edge_attributes(PBC_lattice, edge_discr_flow, name = 'edge_visits')
+grad_discr, sol_discr, har_discr, pot_discr, div_discr = hodge_decomposition(
+    PBC_lattice, 'edge_visits')
+plot_hodge(PBC_lattice, grad_discr, sol_discr, har_discr, pot_discr, div_discr,
+           pos)  
+
+for i in pot.keys():
+    print(pot[i], pot_discr[i])
+
+#%% BOXPLOT OF POTENTIALS
+Dt = 200
+# for Dt in range(95,105, 5):
+n_walk = 20
+boxpl_ls_p = []
+boxpl_ls_g = []
+for i in range(20):
+    walked_PBC_discr = digraph_walkers(PBC_lattice, Dt, n_walk)
+    
+    grad, sol, har, pot, div = hodge_decomposition(
+        walked_PBC_discr, 'edge_visits')
+
+    pot_diff = [(pot_discr[node]-pot[node]) for node in PBC_lattice.nodes]
+    grad_diff = [(grad_discr[edge]-grad[edge]) for edge in PBC_lattice.edges]
+    boxpl_ls_p += pot_diff
+    boxpl_ls_g += grad_diff
+boxpl = []
+boxpl.append(boxpl_ls_p)
+boxpl.append(boxpl_ls_g)
+
+plt.figure()
+plt.boxplot(boxpl, labels =  ['Potential discrepancy'])#, 'Gradient discrepancy'])
+plt.ylabel('Relative discrepancy from predicted random walk')
+plt.tight_layout()
+for i in pot.keys():
+    print(pot[i], pot_discr[i])
+#%% HISTOGRAM OF THE DATA
+from scipy.stats import norm
+# Fit a normal distribution to the data:
+mu, std = norm.fit(boxpl[0])
+plt.xlabel('Discrepancy in the Potentials')
+plt.title("Fitted discrepancy distribution: mu = %.2f,  std = %.2f" % (mu, std))
+# Plot the histogram.
+plt.hist(boxpl[0], bins=50, density=True, alpha=0.6, color='b')
+
+# Plot the PDF.
+xmin, xmax = plt.xlim()
+x = np.linspace(xmin, xmax, 100)
+p = norm.pdf(x, mu, std)
+plt.plot(x, p, 'k', linewidth=2)
+
+
+plt.show()
+
+#%%
+v = 1
+Dt = 20
+# for Dt in range(95,105, 5):
+n_walk = 20
+follow_node = 69
+for i in range(40):
+    walked_PBC, path = periodic_walkers(PBC_lattice, Dt, v, pos, n_walk, N, follow_node)
+    
+    grad, sol, har, pot, div = hodge_decomposition(
+        walked_PBC, 'edge_visits')
+    # print(structural_ratios(PBC_lattice))
+    # plot_hodge(walked_PBC, grad, sol, har, pot, div, pos)
