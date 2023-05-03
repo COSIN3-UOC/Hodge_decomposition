@@ -1170,12 +1170,11 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     plt.show()
 
 
-#%%ERDOS RENYI
 #%% ERDOS_RENYI
 Dt = 15
 v = 1
 n_walk = 200
-erd_reny = nx.erdos_renyi_graph(10, 0.3, seed = 1000, directed=False)
+erd_reny = nx.erdos_renyi_graph(5, 0.5, seed = 1000, directed=False)
 erd_reny = erd_reny.to_directed()
 out_edges = [edge for edge in erd_reny.edges if edge[1]
     < edge[0]]  # removing all outward edges
@@ -1437,4 +1436,51 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # plt.savefig('/Users/robertbenassai/Documents/UOC/figs/lattice_evolution/lattice_dt'+str(Dt)+'.png')
     plt.show()
 
+#%% ADJOINT MATRIX
 
+def build_adjoint_graph(G:nx.DiGraph()):
+    '''
+    Builds the adjacent graph of G.
+
+    Parameters
+    ----------
+    G : nx.DiGraph()
+        Input graph.
+
+    Returns
+    -------
+    adjoint_graph : nx.Graph
+        Adjoint graph of G.
+
+    '''
+    #redefine edges as nodes with a dictionary: edge_id: edge
+    edge_ids = {edge: i for i, edge in enumerate(list(G.edges))}
+    #now we need a dictionary that has node: [(id_edge1, id_edge_2), ...]
+    new_edges = {}
+    adjoint_graph = nx.Graph()
+    adjoint_graph.add_nodes_from(list(edge_ids.values()))
+    
+    for node in G.nodes:
+        adj_edge_id_ls = []
+        if len(list(nx.all_neighbors(G, node))) > 1:
+            adj_edges = list(G.in_edges(node))+list(G.out_edges(node))
+        for i in range(len(adj_edges)):
+            edge_1 = adj_edges.pop(0)
+            for edge_2 in adj_edges:
+                adj_edge_id_ls.append((edge_ids[edge_1], edge_ids[edge_2]))
+        adjoint_graph.add_edges_from(adj_edge_id_ls)
+
+        new_edges[node] = adj_edge_id_ls
+    print(new_edges)
+    return adjoint_graph
+
+adj_ER = build_adjoint_graph(erd_reny)
+
+plt.subplots(1,2, figsize = (8, 4))
+plt.subplot(121)
+plt.title('original')
+nx.draw_networkx(erd_reny, pos = pos_ER)
+plt.subplot(122)
+plt.title('adjoint')
+nx.draw_networkx(adj_ER)
+plt.tight_layout()
