@@ -385,8 +385,9 @@ def periodic_walkers(G, Dt, v, pos, n_walk, N, follow_node):
 
 def node_centric(G, Dt, v, pos, n_walk):
     '''
-    Function that puts n = len(list(G.nodes)) random walkers in a Digraph
-    transitable in both directions and moves them during Dt time. 
+    Function that performs a node centric RW. The function puts n = 
+    len(list(G.nodes)) random walkers in a Digraph transitable in both 
+    directions and moves them during Dt time. 
 
     Parameters
     ----------
@@ -939,7 +940,6 @@ def build_trans_matrix(G):
         for final in G_und.neighbors(node):
             i, j = inode_to_iarr[node], inode_to_iarr[final]
             trans_matrix[j][i] = 1/k
-    i,j = np.indices(trans_rates.shape)
     print(np.sum(trans_matrix, axis = 0))
     return(trans_matrix)
 #%% raising the array to the amount of steps
@@ -1063,7 +1063,7 @@ def build_trans_rates_matrix(G, pos, v):
             #     dist = dists[(node, final)]
             # else:
             #     dist = dists[(final, node)]
-            trans_rates[j][i] = v/(k_deg*mean_dist)
+            trans_rates[j][i] = 1/(k_deg*mean_dist)
     # the diagonal is -sum of the off diag elements of the col
     i,j = np.indices(trans_rates.shape)
     diagonal = np.sum(trans_rates, axis=0)
@@ -1096,10 +1096,10 @@ def dp_dt(p, t, R, dummy):
     dy = R.dot(p)
     return(dy)
 
-def solve_continuous_rw_flow(G, trans_rates, Dt, n_walk):
+def solve_continuous_rw_flow(G:nx.DiGraph, trans_rates:np.array, Dt:float, n_walk:int):
     '''
     Solves the linear differential equations for the node probabilities and 
-    finds the ende flows of discrete random walks on a topological graph.
+    finds the ende flows of continuous random walks on a topological graph.
 
     Parameters
     ----------
@@ -2205,9 +2205,8 @@ nx.set_node_attributes(kite, pos_kite, 'pos')
 nx.draw_networkx(kite, pos_kite)
 #%% SIMULATION DISCRETE
 steps = 100
-n_walk = 500
+n_walk = 200
 walk_kite, occupations = digraph_walkers(kite, steps, n_walk)
-steps = 100
 trans_matrix = build_trans_matrix(kite)
 kite, theo_occupations = discrete_rw_edge_flow(kite, trans_matrix, steps, n_walk)
 grad_discr, sol_discr, har_discr, pot_discr, div_discr = hodge_decomposition(
@@ -2352,11 +2351,11 @@ plt.tight_layout()
 Dt = 15
 v = 1
 n_walk = 200
-erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1001, directed=False)
+erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
 erd_reny = erd_reny.to_directed()
-# out_edges = [edge for edge in erd_reny.edges if edge[1]
-#     < edge[0]]  # removing all outward edges
-# erd_reny.remove_edges_from(out_edges)
+out_edges = [edge for edge in erd_reny.edges if edge[1]
+    < edge[0]]  # removing all outward edges
+erd_reny.remove_edges_from(out_edges)
 pos_ER = nx.spring_layout(erd_reny, seed = 1050)
 nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
 #%%
@@ -2385,8 +2384,9 @@ plt.figure()
 plt.xlabel('Simulated Potential')
 plt.ylabel('Analytical Potential')
 plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+'x +'+
-         str(round(b, 2))+'\n'+r'$r^2 = $' +str(round(r_value**2, 2)))
+plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
+         +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
+         +str(round(r_value**2, 2)))
 plt.plot(x, np.array(x), c='r', label = 'y = x')
 plt.legend()
 plt.tight_layout()
@@ -2414,7 +2414,6 @@ intervals = list(np.linspace(0, Dt, n_intervals))
 #dataframe where we will put the noed occupation at each time interval
 occupation_df = pd.DataFrame({node:np.full_like(intervals, 0) for node 
                               in erd_reny.nodes})
-# occupation_df.insert (0, "time", intervals)
 
 #we take every walk from n_walk realizations
 for walk in paths:
