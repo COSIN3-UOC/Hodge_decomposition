@@ -479,12 +479,13 @@ def node_centric(G, Dt, v, pos, n_walk):
     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
     return(G, path_tot)
 
-#%% EDGE-CENTRIC WITH DIFFERENT EXPONENTIAL RATES
+# %% Adjoint Node-centric random walk
 
-def edge_centric(G, Dt, v, pos, n_walk):
+def adjoint_node_centric(G_adj, G, Dt, v, n_walk, scales, ids_edge):
     '''
-    Function that puts n = len(list(G.nodes)) random walkers in a Digraph
-    transitable in both directions and moves them during Dt time. 
+    Function that performs a node centric RW. The function puts n = 
+    len(list(G.nodes)) random walkers in a Digraph transitable in both 
+    directions and moves them during Dt time. 
 
     Parameters
     ----------
@@ -505,30 +506,29 @@ def edge_centric(G, Dt, v, pos, n_walk):
 
     '''
     path_tot = []
-    # calculating the time intrinsec to each edge
-    delta_t = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
-            for edge in G.edges}
-    nx.set_edge_attributes(G, delta_t, name='dt')
     # upper bound for steps
-    min_edge_time = min(delta_t.values())
-    max_steps = int(Dt/min_edge_time)
+    min_edge_time = max(scales.values())
+    max_steps = int(Dt*min_edge_time)
+    overall_adj_edge_weights = dict.fromkeys(list(G_adj.edges), 0)
     print('maximum steps allowed each realisation', max_steps)
     # overall_edge_weights account for all the edge passings summed for
     # n_walk iterations
-    # MSD_dict = {i:[] for i in G.nodes}
     overall_edge_weights = dict.fromkeys(G.edges, 0)
     for i in range(0, n_walk):
         path = []
         print('realisation '+str(i+1)+'/'+str(n_walk))
         # dictionary of walker index:current_node the walker is in
-        pos_walkers = {i: i for i in G.nodes}
+        pos_walkers = {i: i for i in G_adj.nodes}
+        prev_pos = {i: i for i in G_adj.nodes}
         # edge_weights counts the amount of times a walker has visited
         # each edge in 1 realisation
+        adj_edge_weights = dict.fromkeys(list(G_adj.edges), 0)
         edge_weights = dict.fromkeys(G.edges, 0)
         # first let's difine the time used for each walker
-        time = dict.fromkeys(G.nodes, 0)
-        path.append([list(pos_walkers.values()), list(time.values())])
-        active_walkers = dict.fromkeys(G.nodes, True)
+        time = dict.fromkeys(G_adj.nodes, 0)
+        path.append([[ids_edge[ind] for ind in list(pos_walkers.values())], 
+                     [time[ind] for ind in pos_walkers.keys()]])
+        active_walkers = dict.fromkeys(G_adj.nodes, True)
         # 1 step moves (or tries to move according to time left) all the walkers
         # through a neighboring edge
         for step in range(max_steps):
@@ -543,47 +543,96 @@ def edge_centric(G, Dt, v, pos, n_walk):
                 break
 
             # list of neighboring nodes of each walker
-            neighbors = [{n: (G[pos_walkers[walker]][n]['dt'] if (pos_walkers[walker], n)
-                              in list(G.edges) else G[n][pos_walkers[walker]]['dt'])
-                          for n in nx.all_neighbors(G, pos_walkers[walker])}
-                         for walker in active_ls]
-#            print(neighbors)
+            neighbors = {walker:list(nx.all_neighbors(G_adj, pos_walkers[walker]))
+                         for walker in active_ls}
             # now randomly move the random walker to another node only if time+edge_time
             # is < Dt
-            for walker, goto_nodes in zip(active_ls, neighbors):
+            for walker, possible_nodes in neighbors.items():
                 # time of each possible edge for a given node
-                # if np.any(time[walker] + np.array(list(goto_nodes.values())) <= Dt):
-                # list of the possible final nodes
-                possible_nodes = [k for k in goto_nodes.keys()] #if
-                                  #(goto_nodes[k]+time[walker]) <= Dt]
-                # random selection between the final nodes
-                sel = random.choice(possible_nodes)
-                interval = np.random.exponential(goto_nodes[sel])
-                #if the choice surpasses the allowed time we deactivate the walker
-                if time[walker] + interval > Dt:
-                    # deactivate the walker that has finished
-                    active_walkers[walker] = False
-                    continue
-                # updating edge flow dict
-                if (pos_walkers[walker], sel) in list(G.edges):
-                    edge_weights[(pos_walkers[walker], sel)] += 1
-                elif (sel, pos_walkers[walker]) in list(G.edges):
-                    edge_weights[(sel, pos_walkers[walker])] -= 1
-                else:
-                    print('ini different than final but edge not in graph')
+                curr_edge = ids_edge[pos_walkers[walker]]
+                interval = np.random.exponential(1/scales[curr_edge])
+                if time[walker] + interval <= Dt:
+                    # random selection between the final nodes
+                    sel = random.choice(possible_nodes)
+                    
+                    # updating edge flow dict in the node of the adjoint graph
+                    # final_edge = ids_edge[sel]
+                    # i = curr_edge[0]
+                    # j = curr_edge[1]
+                    # prev_edge = ids_edge[prev_pos[walker]]
+                    # if step > 0:
+                    #     final_edge = ids_edge[sel]
+                    #     i = curr_edge[0]
+                    #     j = curr_edge[1]
+                    #     prev_edge = ids_edge[prev_pos[walker]]
+                        
+                    #     if i in prev_edge and j in final_edge:
+                    #         edge_weights[curr_edge] += 1
+                    #         if step == 1:
+                    #             if prev_edge[1] == i:
+                    #                 edge_weights[prev_edge] += 1
+                    #             else:
+                    #                 edge_weights[prev_edge] -= 1
+                    #     elif j in prev_edge and i in final_edge:
+                    #         edge_weights[curr_edge] -= 1
+                    #         if step == 1:
+                    #             if prev_edge[1] == j:
+                    #                 edge_weights[prev_edge] += 1
+                    #             else:
+                    #                 edge_weights[prev_edge] -= 1
 
-                # updating walker position and time
-                pos_walkers[walker] = sel
-                time[walker] += interval
-                # MSD_dict[walker].append([time[walker],np.array(pos[sel])])
-                # else:
-                #     # desactivate the walker that has finished
-                #     active_walkers[walker] = False
-                #     # print(Counter(active_walkers.values()))
-            path.append([list(pos_walkers.values()), list(time.values())])
+                    # # updating walker position and time
+                    # curr_ind = pos_walkers[walker]
+                    # prev_pos[walker] = curr_ind
+                    if (pos_walkers[walker], sel) in adj_edge_weights.keys():
+                        adj_edge_weights[(pos_walkers[walker], sel)] += 1
+                    else:
+                        adj_edge_weights[(sel, pos_walkers[walker])] -= 1
+                    
+                    pos_walkers[walker] = sel
+                    time[walker] += interval
+                else:
+                    #update the edge flow of the final edge
+                    # i = curr_edge[0]
+                    # j = curr_edge[1]
+                    # prev_edge = ids_edge[prev_pos[walker]]
+                    
+                    # if i in prev_edge:
+                    #     edge_weights[curr_edge] += 1
+                    # else:
+                    #     edge_weights[curr_edge] -= 1
+
+                    # desactivate the walker that has finished
+                    active_walkers[walker] = False
+                    # print(Counter(active_walkers.values()))
+            path.append([[ids_edge[ind] for ind in list(pos_walkers.values())], 
+                         [time[ind] for ind in pos_walkers.keys()]])
         path_tot.append(path)
-        for edge in G.edges:
-            overall_edge_weights[edge] += edge_weights[edge]
+        # for edge in G.edges:
+        #     overall_edge_weights[edge] += edge_weights[edge]
+        for adj_edge, flow in adj_edge_weights.items():
+            overall_adj_edge_weights[adj_edge] += flow
+        
+    #Retrieving the edge flow
+    for id_edge, edge in ids_edge.items():
+        
+        i = edge[0]
+        j = edge[1]
+        #list of edges in the adjoint graph
+        edges_w_flow = list(overall_adj_edge_weights.keys())
+        nbrs_e = [(id_edge, neigh) if (id_edge, neigh) in edges_w_flow else 
+                  (neigh, id_edge) for neigh in G_adj.neighbors(id_edge)]
+        adjac_e = []
+        
+        for adj_edge in nbrs_e:
+            edge_1 = ids_edge[adj_edge[0]]
+            edge_2 = ids_edge[adj_edge[1]]
+            if j not in edge_1 or i not in edge_2:
+                adjac_e.append(overall_adj_edge_weights[adj_edge])
+            else:
+                adjac_e.append(-overall_adj_edge_weights[adj_edge])
+        overall_edge_weights[edge] += 0.5*np.sum(adjac_e)
+    
     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
     return(G, path_tot)
 #%%DISCRETE NON ABSORBING NEWMANN: ANALYTIC DISCRETE RW
@@ -1174,7 +1223,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
 Dt = 15
 v = 1
 n_walk = 200
-erd_reny = nx.erdos_renyi_graph(5, 0.5, seed = 1000, directed=False)
+erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
 erd_reny = erd_reny.to_directed()
 out_edges = [edge for edge in erd_reny.edges if edge[1]
     < edge[0]]  # removing all outward edges
@@ -1296,145 +1345,8 @@ plt.tight_layout()
 print(np.sum(solution_ER[-1,:]/len(erd_reny.nodes)))
 print(np.array(list(Counter(list(dict(erd_reny.degree).values())).keys()))/
       (2*len(erd_reny.edges)))
-def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
-
-    edge_graph = nx.get_edge_attributes(walk_graph, 'edge_visits')
-    
-    g_field = np.array([walk_graph[edge[0]][edge[1]]['edge_visits'] for edge
-                                     in walk_graph.edges])
-    percentile = np.percentile(g_field, 95)
-    
-
-    w = np.array(list(edge_graph.values()))
-    wg = np.array(list(grad_comp.values()))
-    ws = np.array(list(sol_comp.values()))
-    wh = np.array(list(har_comp.values()))
-    weight_g = np.sum(np.square(wg))/np.sum(np.square(w))
-    weight_s = np.sum(np.square(ws))/np.sum(np.square(w))
-    weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
-
-    print(weight_g, weight_s, weight_h, weight_g+weight_s+weight_h)
-    # und_walk = walk_graph.to_undirected()
-    # betweenness_cent = nx.betweenness_centrality(und_walk, weight = 
-    #                                              'dt', normalized =False)
-    deg = walk_graph.degree()
-    deg_dict = {node[0]: node[1] for node in deg}
-    plt.subplots(2, 2, figsize=(15, 15))
-    plt.subplot(221)
-    plt.title('Original Graph 100%')
-
-    # color_p = np.abs(np.array(list(edge_graph.values())))
-    color_p = np.array(list(edge_graph.values()))
-    # colors = np.linspace(0, percentile)
-    # cmap = plt.cm.Oranges
-    colors = np.linspace(-percentile, percentile)
-    cmap = plt.cm.seismic
-    vmin = min(colors)
-    vmax = max(colors)
-
-    # color_div = list(div.values())
-    # colors_div = range(int(min(color_div)), int(max(color_div)))
-    # cmap_div = plt.cm.RdBu_r
-    # vmin_div = min(colors_div)
-    # vmax_div = round(max(color_div))
-
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4, 
-                           node_color='#D3D3D3')
-                            # node_color=color_div, cmap=cmap_div, vmin=vmin_div,
-                            # vmax=vmax_div)
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_p,
-                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 4)
-
-    sm = plt.cm.ScalarMappable(cmap=cmap, 
-                               norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm._A = []
-    cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega\right|$')
-
-    # sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin=vmin_div,
-    #                                                               vmax=vmax_div))
-    # sm2._A = []
-    # cbar2 = plt.colorbar(sm2, location='right')
-    # cbar2.set_label(r'Node div')
-
-    plt.subplot(222)
-    color_g = np.abs(np.array(list(grad_comp.values())))
-    # plotting edges with color gradient
-
-    color_pot = list(pot.values())
-    cmap_pot = plt.cm.PRGn
-    vmax_pot = max([int(np.max(color_pot)), int(np.abs(np.min(color_pot)))])
-    vmin_pot = -vmax_pot
 
 
-    colors = np.linspace(0, percentile)
-    cmap = plt.cm.Oranges
-    vmin = min(colors)
-    vmax = max(colors)
-    plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None,
-                            node_size=8, node_color=color_pot, cmap=cmap_pot,
-                            vmin=vmin_pot, vmax=vmax_pot)
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_g,
-                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax, 
-                           arrowsize = 5, node_size = 8)
-
-    sm = plt.cm.ScalarMappable(
-        cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm._A = []
-    cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega_g\right|$')
-
-    sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin=vmin_pot,
-                                                                  vmax=vmax_pot))
-    sm2._A = []
-    cbar2 = plt.colorbar(sm2, location='right')
-    cbar2.set_label(r'Node potentials')
-
-    colors = np.linspace(0, percentile)
-    cmap = plt.cm.Oranges
-    vmin = min(colors)
-    vmax = max(colors)
-
-    color_s = np.abs(np.array(list(sol_comp.values())))
-    plt.subplot(223)
-    plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
-                           node_color='#D3D3D3')
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_s,
-                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 4)
-
-
-    sm = plt.cm.ScalarMappable(
-        cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm._A = []
-    cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega_s\right|$')
-
-    colors = np.linspace(0, percentile)
-    cmap = plt.cm.Oranges
-    vmin = min(colors)
-    vmax = max(colors)
-
-    color_h = np.array(list(har_comp.values()))
-    plt.subplot(224)
-    plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
-                           node_color='#D3D3D3')
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_h,
-                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 4)
-    sm = plt.cm.ScalarMappable(
-        cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm._A = []
-    cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega_h\right|$')
-
-    plt.tight_layout()
-    # plt.savefig('/Users/robertbenassai/Documents/UOC/figs/lattice_evolution/lattice_dt'+str(Dt)+'.png')
-    plt.show()
 
 #%% ADJOINT MATRIX
 
@@ -1455,6 +1367,7 @@ def build_adjoint_graph(G:nx.DiGraph()):
     '''
     #redefine edges as nodes with a dictionary: edge_id: edge
     edge_ids = {edge: i for i, edge in enumerate(list(G.edges))}
+    ids_edge = {i: edge for i, edge in enumerate(list(G.edges))}
     #now we need a dictionary that has node: [(id_edge1, id_edge_2), ...]
     new_edges = {}
     adjoint_graph = nx.Graph()
@@ -1472,9 +1385,141 @@ def build_adjoint_graph(G:nx.DiGraph()):
 
         new_edges[node] = adj_edge_id_ls
     print(new_edges)
-    return adjoint_graph
+    return adjoint_graph, ids_edge
 
-adj_ER = build_adjoint_graph(erd_reny)
+#%% 
+
+# building the transition rate matrix
+#dict of matrix ind to node index
+def build_trans_adjoint_rates_matrix(G_adj:nx.Graph(), rates:dict, ids_edge:dict):
+    '''
+    Builds the transition rates matrix or generator matrix for an unweighted 
+    random walk in a topological graph for the adjoint graph
+
+    Parameters
+    ----------
+    G : nx.Graph
+        Graph from which the transition rates will be computed.
+    rates : Dict
+        dictionary of node:rate. (rate = v/d)
+    Returns
+    -------
+    trans_rates : npumpy ndarray.
+                  transition rates matrix
+
+    '''    
+    #mapping of each node to its index in the transition rate array
+    inode_to_iarr = {node:i for i, node in enumerate(G_adj.nodes)}
+    #building the array
+    N_e = len(G_adj.nodes)
+    trans_rates = np.zeros((N_e, N_e))
+    for node in G_adj.nodes:
+        #Degree of the departure node
+        k_deg = len(list(G_adj.neighbors(node)))
+                             
+        #for each neighbour we calculate the transition rate probability of going 
+        for final in G_adj.neighbors(node):
+            i, j = inode_to_iarr[node], inode_to_iarr[final]
+            trans_rates[j][i] = rates[ids_edge[node]]/(k_deg)
+    # the diagonal is -sum of the off diag elements of the col
+    i,j = np.indices(trans_rates.shape)
+    diagonal = np.sum(trans_rates, axis=0)
+    trans_rates[i==j] = -diagonal
+    return(trans_rates)
+
+#%%
+def solve_adjoint_ctrw_flow(G: nx.DiGraph(), G_adj:nx.Graph, trans_rates:np.array, 
+                            ids_edge: dict, rates:dict, Dt:float, n_walk:int):
+    '''
+    Solves the linear differential equations for the node probabilities and 
+    finds the ende flows of continuous random walks on a topological graph.
+
+    Parameters
+    ----------
+    G : nx.DiGraph
+        Directed graph in which the RW takes place.
+    trans_rates : Numpy ndarray
+        Array of transition rates.
+    Dt : float
+        Total walking time.
+    n_walk : int
+        number of repetitions of the walks.
+
+    Returns
+    -------
+    nx.DiGraph with an edge attribute called 'edge_visits' with the edge random
+    walk flow.
+
+    '''
+    N = len(list(G_adj.nodes))
+    #mapping of each node to its index in the transition rate array
+    inode_to_iarr = {node:i for i, node in enumerate(G_adj.nodes)}
+    iarr_to_inode = {i:node for i, node in enumerate(G_adj.nodes)}
+    #array of flows through the edges
+    net_flow = np.zeros((N,N))
+    #initial probabilities
+    # for initial in range(len(list(G.nodes))):
+    # p0 = np.ones(len(G.nodes))
+    p0 = np.ones(len(G_adj.nodes))
+    
+    t = np.linspace(start=0, stop=Dt,num=20000)
+    sol = odeint(func=dp_dt, y0=p0, t=t, args = (trans_rates, None))
+    
+    #INTEGRATION
+    #The transition rates are constant, thus the integral (p_i*R_{ij} - p_j*R_{ji}) can
+    #be computed by first integrating the p's and then doing the calculations
+    flows = np.trapz(sol, t, axis=0)
+    
+    #edge flow for adjacent graph
+    for j, p_j in enumerate(flows):
+        
+        for i in range(len(G_adj.nodes)):
+            net_flow[i,j] += flows[i]*trans_rates[j][i] - p_j*trans_rates[i][j]
+
+    net_flow *= n_walk
+    cont_new_adj = {adj_edge: net_flow[inode_to_iarr[adj_edge[0]]][inode_to_iarr[adj_edge[1]]] 
+                for adj_edge in G_adj.edges}
+    final_flow = {}
+    for id_edge, edge in ids_edge.items():
+        
+        i = edge[0]
+        j = edge[1]
+        #list of edges in the adjoint graph
+        edges_w_flow = list(cont_new_adj.keys())
+        nbrs_e = [(id_edge, neigh) if (id_edge, neigh) in edges_w_flow else 
+                  (neigh, id_edge) for neigh in G_adj.neighbors(id_edge)]
+        adjac_e = []
+        
+        for adj_edge in nbrs_e:
+            edge_1 = ids_edge[adj_edge[0]]
+            edge_2 = ids_edge[adj_edge[1]]
+            if j not in edge_1 or i not in edge_2:
+                adjac_e.append(cont_new_adj[adj_edge])
+            else:
+                adjac_e.append(-cont_new_adj[adj_edge])
+        final_flow[edge] = 0.5*np.sum(adjac_e)
+        
+    nx.set_edge_attributes(G, final_flow, name = 'edge_visits')
+    return(G, sol)
+
+#%%Structural_ratios
+#calculates the ratio between the dimension of each hodge component and the dim
+#of the original graph
+def structural_ratios(G):
+    dim_orig = G.number_of_edges()
+    n = G.number_of_nodes()
+    con_comp = len(list(nx.connected_components(G.to_undirected())))
+    dim_grad = n-con_comp
+    
+    dim_curl, _ = find_triangles(G) #dimension of curl is the number of linearly 
+                                    #independent triangles
+    return(dim_grad/dim_orig, dim_curl/dim_orig, 1-dim_grad/dim_orig-dim_curl/dim_orig)
+#%%
+print(structural_ratios(erd_reny))
+adj_ER, ids_edge_ER = build_adjoint_graph(erd_reny)
+
+Dt = 4
+n_walk = 200
 
 plt.subplots(1,2, figsize = (8, 4))
 plt.subplot(121)
@@ -1484,3 +1529,131 @@ plt.subplot(122)
 plt.title('adjoint')
 nx.draw_networkx(adj_ER)
 plt.tight_layout()
+#%%
+rates_ER = {edge: v/np.linalg.norm(np.array(pos_ER[edge[0]])-np.array(pos_ER[edge[1]]))
+        for edge in erd_reny.edges}
+
+
+adj_trans_rates = build_trans_adjoint_rates_matrix(adj_ER.copy(), rates_ER, ids_edge_ER)
+
+ER_theo_adj, sol_ER_adj = solve_adjoint_ctrw_flow(erd_reny, adj_ER.copy(), 
+                                                  adj_trans_rates, ids_edge_ER,
+                                                  rates_ER, Dt, n_walk)
+
+grad_adj, sol_adj, har_adj, pot_adj, div_adj = hodge_decomposition(ER_theo_adj,
+                                                                   'edge_visits')
+plot_hodge(ER_theo_adj, grad_adj, sol_adj, har_adj, pot_adj, div_adj, pos_ER)
+
+#%%
+
+walked_ER_edge, path_edges_ER = adjoint_node_centric(adj_ER.copy(), erd_reny.copy()
+                                                     , Dt, v, n_walk, rates_ER, 
+                                                     ids_edge_ER)
+grad_sim_adj, sol_sim_adj, har_sim_adj, pot_sim_adj, div_sim_adj = \
+    hodge_decomposition(walked_ER_edge,'edge_visits')
+
+plot_hodge(walked_ER_edge, grad_sim_adj, sol_sim_adj, har_sim_adj, pot_sim_adj, 
+           div_sim_adj, pos_ER)
+#%%
+
+n_intervals = 500
+intervals = list(np.linspace(0, Dt, n_intervals))
+#dataframe where we will put the noed occupation at each time interval
+occupation_df = pd.DataFrame({str(edge):np.full_like(intervals, 0) for edge 
+                              in erd_reny.edges})
+
+#we take every walk from n_walk realizations
+for walk in path_edges_ER:
+    # initialize a dataframe with the node where the walker jumps to and the 
+    #time at which they happen of each walker
+    occupation_evo_df = pd.DataFrame({str(edge):np.full_like(intervals, None) for edge 
+                                  in erd_reny.edges})
+    #for every jump we find the interval correponding to the jump time
+    for i, step in enumerate(walk):
+        index =  0
+        edges = step[0]
+        times = step[1]
+        for edge, t in zip(edges, times):
+            # node, t = item[0], item[1]
+            if i == 0:
+                j = 0
+                occupation_evo_df.iloc[j, index] = str(edge)
+
+            else:
+                intervals.append(t)
+                intervals = sorted(intervals)
+                j = intervals.index(t)
+                intervals.remove(t)
+                occupation_evo_df.iloc[j, index] = str(edge)
+            index += 1
+    #filling the df with the current node at all times
+    for column in occupation_evo_df.columns:
+        last_edge = occupation_evo_df.loc[0, column]
+        for n in range(0,n_intervals):
+            # print(type(occupation_evo_df.loc[n, column]))
+            if type(occupation_evo_df.loc[n, column]) != str:
+                occupation_evo_df.loc[n, column] = last_edge
+            else:
+                last_edge = occupation_evo_df.loc[n, column]
+    #now we count how many walkers are at each node at each time step
+    for i_row in range(0, len(occupation_df)):
+        row = occupation_evo_df.iloc[i_row]
+        occupations = dict(Counter(row))
+        for key, value in occupations.items():
+            occupation_df.loc[i_row, key] += value
+            # new_value = cell + value
+            # occupation_df.loc[i_row, key] = new_value
+
+occupation_df = occupation_df.divide(n_walk*len(list(erd_reny.edges)))
+
+#%% PROBABILITY PLOT
+
+plt.figure()
+t = np.linspace(0, Dt, 20000)
+t2 = np.linspace(0, Dt, 500)
+sol = pd.DataFrame(sol_ER_adj/len(erd_reny.edges))
+plt.xlabel('time')
+plt.ylabel('Occupation probabilities')
+for i, edge in enumerate(erd_reny.edges):
+    color = np.random.uniform(0,1, size = 3)
+    plt.plot(t,sol[i], c = color, ls = '-')
+    plt.plot(t2, occupation_df[str(edge)],c = color, ls = '--')
+plt.show()
+plt.tight_layout()
+
+print(np.sum(sol_ER_adj[-1,:]/len(erd_reny.edges)))
+print(np.array(list(Counter(list(dict(adj_ER.degree).values())).keys()))/
+      (2*len(adj_ER.edges)))
+
+#%% PLOT OF PREDICTED VS SIMULATED POTENTIALS ADJOINT CTRW
+pot_list = [(pot_sim_adj[i], pot_adj[i]) for i in pot_sim_adj.keys()]
+x, y = zip(*pot_list)
+    
+a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+pot_linsp = np.linspace(-40, 20, 50)
+plt.figure()
+plt.xlabel('Simulated Potential')
+plt.ylabel('Analytical Potential')
+plt.scatter(x, y, s = 10)
+plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
+         +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
+         +str(round(r_value**2, 2)))
+plt.plot(x, np.array(x), c='r', label = 'y = x')
+plt.legend()
+plt.tight_layout()
+#%% PLOT OF PREDICTED VS SIMULATED GRADIENT COMPONENT ADJOINT CTRW
+grad_list = [(grad_sim_adj[i], grad_adj[i]) for i in grad_sim_adj.keys()]
+x, y = zip(*grad_list)
+    
+a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+pot_linsp = np.linspace(-40, 20, 50)
+plt.figure()
+plt.xlabel('Simulated gradient component')
+plt.ylabel('Analytical gradient component')
+plt.scatter(x, y, s = 10)
+plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+'x +'+
+         str(round(b, 2))+'\n'+r'$r^2 = $' +str(round(r_value**2, 2)))
+plt.plot(x, np.array(x), c='r', label = 'y = x')
+plt.legend()
+plt.tight_layout()
+
