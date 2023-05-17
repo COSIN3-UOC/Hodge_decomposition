@@ -295,13 +295,10 @@ def periodic_walkers(G, Dt, v, pos, n_walk, N, follow_node):
     lattice_gap = 1
     for i in range(N):
         delta_t[(i, i+N*N-N)] = lattice_gap
-    #    print((i, i+N*N-N) in list(PBC_lattice.edges))
         if i==0:
             delta_t[(i,i+N-1)] = lattice_gap 
-    #        print((i,i+N-1) in list(PBC_lattice.edges))
         else:
             delta_t[(i*N, i*N+N-1)] = lattice_gap
-    #        print((i*N, i*N+N-1) in list(PBC_lattice.edges))
     nx.set_edge_attributes(G, delta_t, name='dt')
     # upper bound for steps
     min_edge_time = min(delta_t.values())
@@ -1069,6 +1066,7 @@ def build_trans_rates_matrix(G, pos, v):
     diagonal = np.sum(trans_rates, axis=0)
     trans_rates[i==j] = -diagonal
     return(trans_rates)
+
 
 #%% SYSTEM OF ODES
 from scipy.integrate import odeint
