@@ -808,17 +808,17 @@ def build_trans_rates_matrix(G, pos, v):
             for edge in G_und.edges}
 
     # ONLY FOR PBC_LATTICE ----------------------------------------------------
-    lattice_gap = 1
-    N = 8
-    for i in range(N):
-        dists[(i, i+N*N-N)] = lattice_gap
-        dists[(i+N*N-N, i)] = lattice_gap
-        if i==0:
-            dists[(i,i+N-1)] = lattice_gap 
-            dists[(i+N-1, i)] = lattice_gap 
-        else:
-            dists[(i*N, i*N+N-1)] = lattice_gap
-            dists[(i*N+N-1, i*N)] = lattice_gap
+    # lattice_gap = 1
+    # N = 8
+    # for i in range(N):
+    #     dists[(i, i+N*N-N)] = lattice_gap
+    #     dists[(i+N*N-N, i)] = lattice_gap
+    #     if i==0:
+    #         dists[(i,i+N-1)] = lattice_gap 
+    #         dists[(i+N-1, i)] = lattice_gap 
+    #     else:
+    #         dists[(i*N, i*N+N-1)] = lattice_gap
+    #         dists[(i*N+N-1, i*N)] = lattice_gap
     # -------------------------------------------------------------------------
     #mapping of each node to its index in the transition rate array
     inode_to_iarr = {node:i for i, node in enumerate(G_und.nodes)}
@@ -1293,11 +1293,45 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # plt.savefig('/Users/robertbenassai/Documents/UOC/figs/lattice_evolution/lattice_dt'+str(Dt)+'.png')
     plt.show()
 
+#%%
+def plot_pot_corr(pot_sim, pot_theo, x_label, y_label):
+    pot_list = [(pot_sim[i], pot_theo[i]) for i in pot_sim.keys()]
+    x, y = zip(*pot_list)
+        
+    a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+    plt.figure()
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.scatter(x, y, s = 10)
+    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
+             +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
+             +str(round(r_value**2, 2)))
+    plt.plot(x, np.array(x), c='r', label = 'y = x')
+    plt.legend()
+    plt.tight_layout()
+# PLOT OF PREDICTED VS SIMULATED GRADIENT COMPONENT 
+def plot_grad_corr(grad_sim, grad_theo, x_label, y_label):
+    grad_list = [(grad_sim[i], grad_theo[i]) for i in grad_sim.keys()]
+    x, y = zip(*grad_list)
+        
+    a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+    plt.figure()
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.scatter(x, y, s = 10)
+    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
+             +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' +
+             str(round(r_value**2, 2)))
+    plt.plot(x, np.array(x), c='r', label = 'y = x')
+    plt.legend()
+    plt.tight_layout()
 
 #%% ERDOS_RENYI
-Dt = 15
-v = 1
-n_walk = 200
+
+'''------------------Testing with an Erdös-Rényi graph----------------------'''
+
+''' Building the graph'''
+
 erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
 erd_reny = erd_reny.to_directed()
 out_edges = [edge for edge in erd_reny.edges if edge[1]
@@ -1307,8 +1341,11 @@ pos_ER = nx.spring_layout(erd_reny, seed = 1050)
 nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
 
 #%% DISCRETE WALK
+
 #SIM DISCR
 steps = 100
+n_walk = 120
+
 discr_walk_ER, occupations = digraph_walkers(erd_reny.copy(), steps, n_walk)
 
 grad_discr_sim, sol_discr_sim, har_discr_sim, pot_discr_sim, div_discr_sim = \
@@ -1322,10 +1359,13 @@ discr_ER_theo, theo_occupations = discrete_rw_edge_flow(erd_reny.copy(),
 grad_discr_th, sol_discr_th, har_discr_th, pot_discr_th, div_discr_th = \
     hodge_decomposition(discr_ER_theo, 'edge_visits')
 #%% NODE-CENTRIC WALK
+Dt = 20
+n_walk = 120
+v = 1
 walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
 grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
 
-# THERORETICAL 
+# THEORETICAL 
 
 trans_rate_ER = build_trans_rates_matrix(erd_reny.copy(), pos_ER, v)
 ER_th, solution_ER = solve_continuous_rw_flow(erd_reny, trans_rate_ER, Dt, n_walk)
@@ -1339,70 +1379,11 @@ plot_hodge(walked_ER, grad_ER, sol_ER, har_ER, pot_ER, div_ER,
            pos_ER)
 
 #%% PLOT OF PREDICTED VS SIMULATED POTENTIALS CTRW
-pot_list_discr = [(pot_discr_sim[i], pot_discr_th[i]) for i in pot_discr_sim.keys()]
-x, y = zip(*pot_list_discr)
-    
-a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-pot_linsp = np.linspace(-40, 20, 50)
-plt.subplots(1,2, figsize = (10, 4))
-plt.subplot(121)
-plt.xlabel('Simulated Potential')
-plt.ylabel('Analytical Potential')
-plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-         +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
-         +str(round(r_value**2, 2)))
-plt.plot(x, np.array(x), c='r', label = 'y = x')
-plt.legend()
 
-pot_list_nc = [(pot_ER[i], pot_cont_new[i]) for i in pot_ER.keys()]
-x, y = zip(*pot_list_nc)
-    
-a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-pot_linsp = np.linspace(-40, 20, 50)
-plt.subplot(122)
-plt.xlabel('Simulated Potential')
-plt.ylabel('Analytical Potential')
-plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-         +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
-         +str(round(r_value**2, 2)))
-plt.plot(x, np.array(x), c='r', label = 'y = x')
-plt.legend()
-
-#%%
-grad_list_discr = [(grad_discr_sim[i], grad_discr_th[i]) for i in grad_discr_sim.keys()]
-x, y = zip(*grad_list_discr)
-    
-a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-pot_linsp = np.linspace(-40, 20, 50)
-plt.subplots(1,2, figsize = (10, 4))
-plt.subplot(121)
-plt.xlabel('Simulated gradient component')
-plt.ylabel('Analytical gradient component')
-plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-         +str(round(std_err,2))+'x +'+ str(round(b, 2))+'\n'+r'$r^2 = $' 
-         +str(round(r_value**2, 2)))
-plt.plot(x, np.array(x), c='r', label = 'y = x')
-plt.legend()
-plt.tight_layout()
-
-grad_list = [(grad_ER[i], g_cont_new[i]) for i in grad_ER.keys()]
-x, y = zip(*grad_list)
-    
-a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-pot_linsp = np.linspace(-40, 20, 50)
-plt.subplot(122)
-plt.xlabel('Simulated gradient component')
-plt.ylabel('Analytical gradient component')
-plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-         +str(round(std_err,2))+'x +'+ str(round(b, 2))+'\n'+r'$r^2 = $' 
-         +str(round(r_value**2, 2)))
-plt.plot(x, np.array(x), c='r', label = 'y = x')
-plt.legend()
-plt.tight_layout()
+plot_pot_corr(pot_discr_sim, pot_discr_th, 'Simulated Potential', 
+              'Analytical Potential')
+plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component', 
+               'Analytical gradient component')
 
 #%%
 import math
@@ -1602,9 +1583,6 @@ def solve_adjoint_ctrw_flow(G: nx.DiGraph(), G_adj:nx.Graph, trans_rates:np.arra
     #array of flows through the edges
     net_flow = np.zeros((N,N))
     #initial probabilities
-    # for initial in range(len(list(G.nodes))):
-    # p0 = np.ones(len(G.nodes))
-    # p0 = np.ones(len(G_adj.nodes))
     p0 = np.ones(len(G_adj.nodes))
     t = np.linspace(start=0, stop=Dt,num=20000)
     sol = odeint(func=dp_dt, y0=p0, t=t, args = (trans_rates, None))
@@ -1692,7 +1670,7 @@ def structural_ratios(G):
                                     #independent triangles
     return(dim_grad/dim_orig, dim_curl/dim_orig, 1-dim_grad/dim_orig-dim_curl/dim_orig)
 #%%
-erd_reny = nx.erdos_renyi_graph(70, 0.08, seed = 1000, directed=False)
+erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
 erd_reny = erd_reny.to_directed()
 out_edges = [edge for edge in erd_reny.edges if edge[1]
     < edge[0]]  # removing all outward edges
@@ -1711,9 +1689,11 @@ plt.subplot(122)
 plt.title('adjoint')
 nx.draw_networkx(adj_ER)
 plt.tight_layout()
-#%%
-Dt = 150
-n_walk = 500
+#%% ADJOINT THEORETICAL
+Dt = 20
+n_walk = 120
+v = 1
+
 rates_ER = {edge: v/np.linalg.norm(np.array(pos_ER[edge[0]])-np.array(pos_ER[edge[1]]))
         for edge in erd_reny.edges}
 
@@ -1731,7 +1711,7 @@ grad_adj, sol_adj, har_adj, pot_adj, div_adj = hodge_decomposition(ER_theo_adj,
                                                                    'edge_visits')
 plot_hodge(ER_theo_adj, grad_adj, sol_adj, har_adj, pot_adj, div_adj, pos_ER)
 
-#%%
+#%% ADJOINT SIMULATION
 
 walked_ER_edge, path_edges_ER = adjoint_node_centric(adj_ER.copy(), erd_reny.copy()
                                                      , Dt, v, n_walk, rates_ER, 
@@ -1818,40 +1798,37 @@ print(np.array(list(Counter(list(dict(adj_ER.degree).values())).keys()))/
 
 #%% PLOT OF PREDICTED VS SIMULATED POTENTIALS ADJOINT CTRW
 
-pot_list = [(pot_sim_adj[i], pot_adj[i]) for i in pot_sim_adj.keys()]
-x, y = zip(*pot_list)
-    
-a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-pot_linsp = np.linspace(-40, 20, 50)
-plt.figure()
-plt.xlabel('Simulated Potential')
-plt.ylabel('Analytical Potential')
-plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-         +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
-         +str(round(r_value**2, 2)))
-plt.plot(x, np.array(x), c='r', label = 'y = x')
-plt.legend()
-plt.tight_layout()
-#%% PLOT OF PREDICTED VS SIMULATED GRADIENT COMPONENT ADJOINT CTRW
-grad_list = [(grad_sim_adj[i], grad_adj[i]) for i in grad_sim_adj.keys()]
-x, y = zip(*grad_list)
-    
-a, b, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-pot_linsp = np.linspace(-40, 20, 50)
-plt.figure()
-plt.xlabel('Simulated gradient component')
-plt.ylabel('Analytical gradient component')
-plt.scatter(x, y, s = 10)
-plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-         +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' +
-         str(round(r_value**2, 2)))
-plt.plot(x, np.array(x), c='r', label = 'y = x')
-plt.legend()
-plt.tight_layout()
+plot_pot_corr(pot_sim_adj, pot_adj, 'Simulated Potential', 'Analytical Potential')
+plot_grad_corr(grad_sim_adj, grad_adj, 'Simulate4d Gradient component',
+               'Analytical Gradient Component' )
 
+#%% CONSTANT VELOCITY WALK
+Dt = 20
+n_walk = 120
+v = 1
+walked_v_ER = node_walkers(erd_reny.copy(), Dt, v, pos_ER, n_walk)
+grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, div_cnst_v = \
+    hodge_decomposition(walked_v_ER,'edge_visits')
+
+#%% correlations between dynamics: PBC LATTICE
+#edge centric
+plot_pot_corr(pot_adj, pot_cnst_v, 'Potential Adjoint Model', 
+              'Potential constant velocity')
+plot_grad_corr(grad_adj, grad_cnst_v, 'Grad. comp. Adjoint Model', 
+              'Grad. comp. constant velocity')
+
+#node centric
+plot_pot_corr(pot_cont_new, pot_cnst_v,'Potential Node Centric', 
+              'Potential constant velocity')
+
+plot_grad_corr(g_cont_new, grad_cnst_v,'Grad. comp. Node Centric', 
+              'Grad. comp. constant velocity')
 #%%BUILDING A LATTICE GRAPH WITH PERIODIC BOUNDARY CONDITIONS AND ADDING NODES
 #AT THE CENTRE
+
+'''-----------------TESTING WITH THE PBC MODIFIED LATTICE-------------------'''
+
+
 N = 8
 PBC_lattice =nx.grid_2d_graph(N,N,periodic=True)
 new_edges = []
@@ -1908,6 +1885,7 @@ print(new_vertexes)
 
 
 #%%ADDING THE NEW EDGES TO THE GRAPH
+
 for i in range(0, 4):
     new_edges += [((4,3+i/4), (4, 3+(i+1)/4))]
     new_edges += [((3+i/4,4), (3+(i+1)/4, 4))]
@@ -1991,3 +1969,67 @@ hodge_decomposition(constant_v_pbc, 'edge_visits')
 
 plot_hodge(constant_v_pbc, g_PBC_cont, s_PBC_cont, h_PBC_cont, pot_PBC_cont, 
            div_PBC_cont, pos_PBC)
+#%% edge centric
+Dt = 20
+n_walk = 100
+v = 1
+rates_PBC = {edge: v/np.linalg.norm(np.array(pos_PBC[edge[0]])-np.array(pos_PBC[edge[1]]))
+        for edge in PBC_lattice.edges}
+
+# ONLY FOR PBC_LATTICE ----------------------------------------------------
+lattice_gap = 1
+N = 8
+for i in range(N):
+    rates_PBC[(i, i+N*N-N)] = v/lattice_gap
+    rates_PBC[(i+N*N-N, i)] = v/lattice_gap
+    if i==0:
+        rates_PBC[(i,i+N-1)] = v/lattice_gap 
+        rates_PBC[(i+N-1, i)] = v/lattice_gap 
+    else:
+        rates_PBC[(i*N, i*N+N-1)] = v/lattice_gap
+        rates_PBC[(i*N+N-1, i*N)] = v/lattice_gap
+#-----------------------------------------------------------------------
+#THEORETICAL ADJ PBC
+adj_PBC, ids_edge_PBC = build_adjoint_graph(PBC_lattice)
+adj_trans_rates_PBC = build_trans_adjoint_rates_matrix(adj_PBC.copy(), 
+                                                       rates_PBC, ids_edge_PBC)
+
+PBC_theo_adj, sol_PBC_adj = solve_adjoint_ctrw_flow(PBC_lattice.copy(), adj_PBC.copy(), 
+                                                  adj_trans_rates_PBC, ids_edge_PBC,
+                                                  rates_PBC, Dt, n_walk)
+
+total_fl_theo = {edge:PBC_theo_adj[edge[0]][edge[1]]['edge_visits'] for edge in 
+                PBC_theo_adj.edges}
+
+grad_adj_PBC, sol_adj_PBC, har_adj_PBC, pot_adj_PBC, div_adj_PBC = \
+    hodge_decomposition(PBC_theo_adj,'edge_visits')
+plot_hodge(PBC_theo_adj, grad_adj_PBC, sol_adj_PBC, har_adj_PBC, 
+           pot_adj_PBC, div_adj_PBC, pos_PBC)
+#%%
+
+
+walked_PBC_edge, _ = adjoint_node_centric(adj_PBC.copy(), PBC_lattice.copy()
+                                                     , Dt, v, n_walk, rates_PBC, 
+                                                     ids_edge_PBC)
+
+total_fl_sim = {edge:walked_PBC_edge[edge[0]][edge[1]]['edge_visits'] for edge in 
+                walked_PBC_edge.edges}
+
+grad_sim_adj_PBC, sol_sim_adj_PBC, har_sim_adj_PBC, pot_sim_adj_PBC, div_sim_adj_PBC = \
+    hodge_decomposition(walked_PBC_edge,'edge_visits')
+
+plot_hodge(walked_PBC_edge, grad_sim_adj_PBC, sol_sim_adj_PBC, har_sim_adj_PBC, 
+           pot_sim_adj_PBC, div_sim_adj_PBC, pos_PBC)
+#%% correlations between dynamics: PBC LATTICE
+#edge centric
+plot_pot_corr(pot_adj_PBC, pot_PBC_cont, 'Potential Adjoint Model', 
+              'Potential constant velocity')
+plot_grad_corr(grad_adj_PBC, g_PBC_cont, 'Grad. comp. Adjoint Model', 
+              'Grad. comp. constant velocity')
+
+#node centric
+plot_pot_corr(pot_PBC_th, pot_PBC_cont,'Potential Node Centric', 
+              'Potential constant velocity')
+
+plot_grad_corr(g_PBC_th, g_PBC_cont,'Grad. comp. Node Centric', 
+              'Grad. comp. constant velocity')
