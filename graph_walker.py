@@ -783,8 +783,8 @@ g = nx.DiGraph()
 
 # 2 triangles
 g.add_nodes_from([0, 1, 2, 3, 4])
-g.add_edges_from([(0, 1), (2, 0), (1, 2), (1, 3), (2, 3), (3, 4), (0, 4)])
-attr = {(0, 1): 3, (2, 0): 3, (1, 2): 2, (1, 3): 1, (2, 3): 1, (3, 4): -2, (0, 4): 1}
+g.add_edges_from([(0, 1), (0, 2), (1, 2), (1, 3), (2, 3), (3, 4), (0, 4)])
+attr = {(0, 1): 3, (0, 2): 3, (1, 2): 2, (1, 3): 1, (2, 3): 1, (3, 4): -2, (0, 4): 1}
 # line
 # g.add_nodes_from([0, 1, 2, 3])
 # g.add_edges_from([(0,1), (1,2), (2,3)])
@@ -792,10 +792,10 @@ attr = {(0, 1): 3, (2, 0): 3, (1, 2): 2, (1, 3): 1, (2, 3): 1, (3, 4): -2, (0, 4
 
 
 nx.set_edge_attributes(g, attr, name='edge_visits')
-grad_comp, sol_comp, har_comp, div = hodge_decomposition(g, 'edge_visits')
-grad_comp = {comp: round(grad_comp[comp], 4) for comp in grad_comp.keys()}
-sol_comp = {comp: round(sol_comp[comp], 4) for comp in sol_comp.keys()}
-har_comp = {comp: round(har_comp[comp], 4) for comp in har_comp.keys()}
+grad_comp, sol_comp, har_comp, pot_nodes, div = hodge_decomposition(g, 'edge_visits')
+grad_comp = {comp: round(grad_comp[comp], 2) for comp in grad_comp.keys()}
+sol_comp = {comp: round(sol_comp[comp], 2) for comp in sol_comp.keys()}
+har_comp = {comp: round(har_comp[comp], 2) for comp in har_comp.keys()}
 # pos = EoN.hierarchy_pos(G, 0, width = 1)
 # g = tree_w
 pos = nx.planar_layout(g)
@@ -808,36 +808,121 @@ nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=attr,
                              rotate=False, font_size=15)
 plt.axis('off')
 # %%
-
+node_size = 400
 plt.subplots(2, 2, figsize=(10, 10))
 plt.subplot(221)
-plt.title('original')
-nx.draw_networkx(g, pos=pos, with_labels=True, node_size=250, font_size=15,
-                 node_color='#AED0EE')
+plt.title('Original', fontsize = 18)
+
+# nx.draw_networkx(g, pos=pos, with_labels=True, node_size=node_size, font_size=15,
+#                  node_color='#AED0EE', arrowstyle = '-|>', linewidths = 2)
+nx.draw_networkx_nodes(g, pos=pos, node_size=node_size,
+                 node_color='#AED0EE', linewidths = 1.5, edgecolors = 'black')
+nx.draw_networkx_edges(g, pos=pos, width=1.5, node_size=node_size,
+                 arrowstyle = '-|>', connectionstyle='arc3,rad=0.0')
+
+nx.draw_networkx_labels(g, pos, labels=None, font_size=15, font_color='k', 
+                        font_family='sans-serif', font_weight='normal',
+                        alpha=None, bbox=None, horizontalalignment='center',
+                        verticalalignment='center_baseline', ax=None, clip_on=True)
+
 nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=attr,
                              rotate=False, font_size=15)
 
 plt.subplot(222)
-plt.title('gradient')
-nx.draw_networkx(g, pos=pos, with_labels=True, node_size=250, font_size=15,
-                 node_color='#AED0EE')
+plt.title('Gradient', fontsize = 18)
+
+nx.draw_networkx_nodes(g, pos=pos, node_size=node_size,
+                 node_color='#AED0EE', linewidths = 1.5, edgecolors = 'black')
+nx.draw_networkx_edges(g, pos=pos, width=1.5, node_size=node_size,
+                 arrowstyle = '-|>', connectionstyle='arc3,rad=0.0')
+
+nx.draw_networkx_labels(g, pos, labels=None, font_size=15, font_color='k', 
+                        font_family='sans-serif', font_weight='normal',
+                        alpha=None, bbox=None, horizontalalignment='center',
+                        verticalalignment='center_baseline', ax=None, clip_on=True)
+
 nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=grad_comp,
                              rotate=False, font_size=15)
-
 plt.subplot(223)
-plt.title('solenoidal')
-nx.draw_networkx(g, pos=pos, with_labels=True, node_size=250, font_size=15,
-                 node_color='#AED0EE')
-nx.draw_networkx_edge_labels(g, pos, edge_labels=sol_comp,
+plt.title('Solenoidal', fontsize = 18)
+
+nx.draw_networkx_nodes(g, pos=pos, node_size=node_size,
+                 node_color='#AED0EE', linewidths = 1.5, edgecolors = 'black')
+nx.draw_networkx_edges(g, pos=pos, width=1.5, node_size=node_size,
+                 arrowstyle = '-|>', connectionstyle='arc3,rad=0.0')
+
+nx.draw_networkx_labels(g, pos, labels=None, font_size=15, font_color='k', 
+                        font_family='sans-serif', font_weight='normal',
+                        alpha=None, bbox=None, horizontalalignment='center',
+                        verticalalignment='center_baseline', ax=None, clip_on=True)
+
+nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=sol_comp,
                              rotate=False, font_size=15)
 
 plt.subplot(224)
-plt.title('harmonic')
-nx.draw_networkx(g, pos=pos, with_labels=True, node_size=250, font_size=15,
-                 node_color='#AED0EE')
+plt.title('Harmonic', fontsize = 18)
+
+nx.draw_networkx_nodes(g, pos=pos, node_size=node_size,
+                 node_color='#AED0EE', linewidths = 1.5, edgecolors = 'black')
+nx.draw_networkx_edges(g, pos=pos, width=1.5, node_size=node_size,
+                 arrowstyle = '-|>', connectionstyle='arc3,rad=0.0')
+
+nx.draw_networkx_labels(g, pos, labels=None, font_size=15, font_color='k', 
+                        font_family='sans-serif', font_weight='normal',
+                        alpha=None, bbox=None, horizontalalignment='center',
+                        verticalalignment='center_baseline', ax=None, clip_on=True)
+
 nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=har_comp,
                              rotate=False, font_size=15)
 plt.tight_layout()
+
+#%%
+
+import matplotlib.pyplot as plt
+import networkx as nx
+
+node_size = 500
+fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+plt.subplots_adjust(hspace=0.4)
+
+# Set common styling parameters
+common_params = {
+    "node_size": node_size,
+    "node_color": "#AED0EE",
+    "linewidths": 2,
+    "edgecolors": "black",
+}
+
+# Set styling parameters for edge labels
+edge_label_params = {
+    "font_size": 16,
+    "bbox": {"facecolor": "white", "edgecolor": "none", "pad": 0.5},
+}
+
+# Iterate over subplots
+for ax, title, edge_labels in zip(
+    axs.flatten(),
+    ["Original", "Gradient", "Solenoidal", "Harmonic"],
+    [attr, grad_comp, sol_comp, har_comp],
+):
+    ax.set_title(title, fontsize=20)
+
+    # Draw nodes and edges
+    nx.draw_networkx_nodes(g, pos=pos, ax=ax, **common_params)
+    nx.draw_networkx_edges(g, pos=pos, width=2, arrowstyle="-|>", 
+                           connectionstyle="arc3,rad=0.0", ax=ax, node_size=node_size)
+
+    # Draw labels and edge labels
+    nx.draw_networkx_labels(g, pos, font_size=18, font_color="black", ax=ax, verticalalignment='center_baseline')
+    nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=edge_labels, rotate=False, 
+                                 **edge_label_params, ax=ax, label_pos=0.55)
+
+    # Set axis properties
+    ax.tick_params(left=False, labelleft=False, bottom=False, labelbottom=False)
+    ax.set_facecolor("#F7F7F7")
+
+plt.tight_layout()
+plt.show()
 
 # %% WHEEL
 
@@ -2362,3 +2447,220 @@ with open('st_mart_dec.txt', 'r', newline='\n') as file:
     for i in data:
         dict_ls.append(eval(i))
 file.close()
+
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+
+N = 100
+
+# Create lattice grid
+grid_size = int(np.sqrt(N))
+x, y = np.meshgrid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size))
+
+# Flatten the grid coordinates
+x = x.flatten()
+y = y.flatten()
+
+# Generate random angle values
+angles = np.random.uniform(0, 2*np.pi, N)
+
+# Set swirling flow vectors
+u = np.cos(angles)
+v = np.sin(angles)
+
+# Normalize the flow vectors
+norm = np.sqrt(u**2 + v**2)
+u_normalized = u / norm
+v_normalized = v / norm
+
+# Set fixed arrow length
+arrow_length = 0.1
+
+# Scale the normalized flow vectors to the fixed length
+u_scaled = u_normalized * arrow_length
+v_scaled = v_normalized * arrow_length
+
+# Create the quiver plot
+fig, ax = plt.subplots()
+ax.quiver(x, y, u_scaled, v_scaled, angles='xy', scale_units='xy', scale=1, color='black')
+
+# Set axis limits
+ax.set_xlim([-0.1, 1.1])
+ax.set_ylim([-0.1, 1.1])
+
+# Remove title
+ax.set_title('')
+
+# Remove x and y ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set aspect ratio
+ax.set_aspect('equal')
+
+# Display the plot
+plt.show()
+
+#%%
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+N = 100
+
+# Create lattice grid
+grid_size = int(np.sqrt(N))
+x, y = np.meshgrid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size))
+
+# Flatten the grid coordinates
+x = x.flatten()
+y = y.flatten()
+
+# Calculate the distance from the central source
+dist = np.sqrt((x - 0.5)**2 + (y - 0.5)**2)
+
+# Set flow vectors
+u = (x - 0.5) / dist
+v = (y - 0.5) / dist
+
+# Normalize the flow vectors
+norm = np.sqrt(u**2 + v**2)
+u_normalized = u / norm
+v_normalized = v / norm
+
+# Set fixed arrow length
+arrow_length = 0.1
+
+# Scale the normalized flow vectors to the fixed length
+u_scaled = u_normalized * arrow_length
+v_scaled = v_normalized * arrow_length
+
+# Create the quiver plot
+fig, ax = plt.subplots()
+ax.quiver(x, y, u_scaled, v_scaled, angles='xy', scale_units='xy', scale=1, color='black')
+
+# Set axis limits
+ax.set_xlim([0, 1])
+ax.set_ylim([0, 1])
+
+# Remove title
+ax.set_title('')
+
+# Remove x and y ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set aspect ratio
+ax.set_aspect('equal')
+
+# Display the plot
+plt.show()
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+
+N = 100
+
+# Create lattice grid
+grid_size = int(np.sqrt(N))
+x, y = np.meshgrid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size))
+
+# Flatten the grid coordinates
+x = x.flatten()
+y = y.flatten()
+
+# Calculate the angle from the center of the grid
+angle = np.arctan2(y - 0.5, x - 0.5)
+
+# Set flow vectors
+u = -np.sin(angle)
+v = np.cos(angle)
+
+# Normalize the flow vectors
+norm = np.sqrt(u**2 + v**2)
+u_normalized = u / norm
+v_normalized = v / norm
+
+# Set fixed arrow length
+arrow_length = 0.1
+
+# Scale the normalized flow vectors to the fixed length
+u_scaled = u_normalized * arrow_length
+v_scaled = v_normalized * arrow_length
+
+# Create the quiver plot
+fig, ax = plt.subplots()
+ax.quiver(x, y, u_scaled, v_scaled, angles='xy', scale_units='xy', scale=1, color='black')
+
+# Set axis limits
+ax.set_xlim([-0.1, 1.1])
+ax.set_ylim([-0.1, 1.1])
+
+# Remove title
+ax.set_title('')
+
+# Remove x and y ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set aspect ratio
+ax.set_aspect('equal')
+
+# Display the plot
+plt.show()
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+
+N = 100
+
+# Create lattice grid
+grid_size = int(np.sqrt(N))
+x, y = np.meshgrid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size))
+
+# Flatten the grid coordinates
+x = x.flatten()
+y = y.flatten()
+
+# Calculate the distance from the center of the grid
+distance = np.sqrt((x - 0.5)**2 + (y - 0.5)**2)
+
+# Set flow vectors
+theta = np.arctan2(y - 0.5, x - 0.5)
+rotation_factor = 2.5  # Adjust this value to control the tightness of the spiral
+u = np.cos(theta + rotation_factor * distance) * distance
+v = np.sin(theta + rotation_factor * distance) * distance
+
+# Normalize the flow vectors
+norm = np.sqrt(u**2 + v**2)
+u_normalized = u / norm
+v_normalized = v / norm
+
+# Set fixed arrow length
+arrow_length = 0.1
+
+# Scale the normalized flow vectors to the fixed length
+u_scaled = u_normalized * arrow_length
+v_scaled = v_normalized * arrow_length
+
+# Create the quiver plot
+fig, ax = plt.subplots()
+ax.quiver(x, y, u_scaled, v_scaled, angles='xy', scale_units='xy', scale=1, color='black')
+
+# Set axis limits
+ax.set_xlim([-0.1, 1.1])
+ax.set_ylim([-0.1, 1.1])
+
+# Remove title
+ax.set_title('')
+
+# Remove x and y ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set aspect ratio
+ax.set_aspect('equal')
+
+# Display the plot
+plt.show()
