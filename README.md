@@ -1,0 +1,46 @@
+
+# Mesoscale building blocks of pedestrian mobility: a discrete vector field approach
+
+## Table of Contents
+
+- [About](#about)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [License](#license)
+
+## About
+
+This project aims to find the effects of urban and pedestrian network geometry on pedestrian flow.
+
+## Features
+
+Thre main code where the project has been developed is "walker_dynamics.py"
+
+## Installation
+
+Latest versions of the following python libraries:
+
+- pandas 
+- geopandas
+- sympy
+- itertools 
+- scipy
+- networkx 
+- matplotlib.pyplot 
+- random
+- np
+- sns
+- csv
+- collections
+- 
+
+## License
+
+Creative commons
+
+## Contact (optional)
+
+rbenassai@uoc.edu
+
