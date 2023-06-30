@@ -6,11 +6,7 @@ Created on Mon May  1 11:56:41 2023
 @author: robertbenassai
 """
 
-import json
-from shapely.geometry.polygon import Polygon
-from shapely.geometry import Point, LineString
-from contextily import add_basemap
-import momepy
+
 import pandas as pd
 import geopandas as gpd
 import scipy
@@ -437,7 +433,7 @@ def node_centric(G, Dt, v, pos, n_walk):
     overall_edge_weights = dict.fromkeys(G.edges, 0)
     for i in range(0, n_walk):
         path = []
-        print('realisation '+str(i+1)+'/'+str(n_walk))
+        # print('realisation '+str(i+1)+'/'+str(n_walk))
         # dictionary of walker index:current_node the walker is in
         pos_walkers = {i: i for i in G.nodes}
         # edge_weights counts the amount of times a walker has visited
@@ -614,9 +610,9 @@ def adjoint_node_centric(G_adj, G, Dt, v, n_walk, scales, ids_edge):
                     i = curr_edge[0]
                     j = curr_edge[1]
                     prev_edge = ids_edge[prev_pos[walker]]
-                    if random.choice([True, False]):
-                    # thrs_prob = cumulative_exp(Dt-time[walker],1/scales[curr_edge])
-                    # if random.uniform(0, 1) <= thrs_prob: 
+                    # if random.choice([True, False]):
+                    thrs_prob = cumulative_exp(Dt-time[walker],1/scales[curr_edge])
+                    if random.uniform(0, 1) <= thrs_prob: 
                         
                         if i in prev_edge:
                             edge_weights[curr_edge] += 1
@@ -820,7 +816,7 @@ def find_triangles(G):
 
 # building the transition rate matrix
 #dict of matrix ind to node index
-def build_trans_rates_matrix(G, pos, v, new_edges, short_1, short_2):
+def build_trans_rates_matrix(G, pos, v):#, new_edges, short_1, short_2):
     '''
     Builds the transition rates matrix or generator matrix for an unweighted 
     random walk in a topological graph Rij = v/(k_j*Dx_ij)
@@ -846,30 +842,30 @@ def build_trans_rates_matrix(G, pos, v, new_edges, short_1, short_2):
             for edge in G_und.edges}
     # print(Counter(dists.values()))
     # ONLY FOR PBC_LATTICE ----------------------------------------------------
-    lattice_gap = 1
-    N = 8
-    for i in range(N):
-        dists[(i, i+N*N-N)] = lattice_gap
-        dists[(i+N*N-N, i)] = lattice_gap
-        if i==0:
-            dists[(i,i+N-1)] = lattice_gap 
-            dists[(i+N-1, i)] = lattice_gap 
-        else:
-            dists[(i*N, i*N+N-1)] = lattice_gap
-            dists[(i*N+N-1, i*N)] = lattice_gap
+    # lattice_gap = 1
+    # N = 8
+    # for i in range(N):
+    #     dists[(i, i+N*N-N)] = lattice_gap
+    #     dists[(i+N*N-N, i)] = lattice_gap
+    #     if i==0:
+    #         dists[(i,i+N-1)] = lattice_gap 
+    #         dists[(i+N-1, i)] = lattice_gap 
+    #     else:
+    #         dists[(i*N, i*N+N-1)] = lattice_gap
+    #         dists[(i*N+N-1, i*N)] = lattice_gap
     # -------------------------------------------------------------------------
-    for new_e in new_edges:
-        if new_e in dists.keys():
-            if dists[new_e] == 0.25:
-                dists[new_e] /= short_1
-            else:
-                dists[new_e] /= short_2
-        else:
-            orig_dist = dists[(new_e[1], new_e[0])]
-            if orig_dist == 0.25:
-                dists[(new_e[1], new_e[0])] /= short_1
-            else:
-                dists[(new_e[1], new_e[0])] /= short_2
+    # for new_e in new_edges:
+    #     if new_e in dists.keys():
+    #         if dists[new_e] == 0.25:
+    #             dists[new_e] /= short_1
+    #         else:
+    #             dists[new_e] /= short_2
+    #     else:
+    #         orig_dist = dists[(new_e[1], new_e[0])]
+    #         if orig_dist == 0.25:
+    #             dists[(new_e[1], new_e[0])] /= short_1
+    #         else:
+    #             dists[(new_e[1], new_e[0])] /= short_2
 
     #mapping of each node to its index in the transition rate array
     inode_to_iarr = {node:i for i, node in enumerate(G_und.nodes)}
@@ -1032,7 +1028,7 @@ def hodge_decomposition(G, attr_name):
     # print('divergence\n',div_arr)
 
     pot_field = np.squeeze(np.asarray(Apinv.dot(-div_arr)))
-    print('error in node potentials', lap.dot(pot_field)+div_arr)
+    # print('error in node potentials', lap.dot(pot_field)+div_arr)
     # gradient of the potential field
     # pot_field.insert(remove_index, 0)
     pot_nodes = {n: pot for n, pot in zip(G.nodes, pot_field)}
@@ -1043,7 +1039,7 @@ def hodge_decomposition(G, attr_name):
 # Calculating the edge-2 matrix or oriented-face incidence matrix which
 # corresponds to the curl operator
     n_tri, tri_dict = find_triangles(G)
-    print('number of triangles', n_tri)
+    # print('number of triangles', n_tri)
     if n_tri != 0:
         curl_op = []
         # creating the curl operator:
@@ -1106,12 +1102,11 @@ def hodge_decomposition(G, attr_name):
         # solving the system of equations
         tri_pot = rot_arr_inv.dot(g_field)
         # tri_pot = np.squeeze(np.asarray(rot_pinv.dot(rot)))
-        print('error curl component',
-              curl_op.dot(np.transpose(curl_op)).dot(tri_pot)-rot)
+        # print('error curl component',
+        #       curl_op.dot(np.transpose(curl_op)).dot(tri_pot)-rot)
         # solenoidal component is delta1* (transpose of curl op) of the potential:
         g_s = np.transpose(curl_op).dot(tri_pot)
-        print('curl of graph',
-              rot)
+        # print('curl of graph', rot)
         sol_comp = {edge: comp for edge, comp in zip(G.edges, g_s)}
         # for edge, comp in zip(G.edges, g_s):
         #     sol_comp[edge] = comp
@@ -1396,7 +1391,7 @@ nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
 
 #%% Random Geometric
 # Use seed when creating the graph for reproducibility
-G = nx.random_geometric_graph(50, 0.2, seed=1000)
+G = nx.random_geometric_graph(10, 0.47, seed=1000)
 # position is stored as node attribute data for random_geometric_graph
 pos_ER = nx.get_node_attributes(G, "pos")
 # transforming the graph into a digraph
@@ -1447,7 +1442,7 @@ plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component',
                'Analytical gradient component')
 #%% NODE-CENTRIC WALK
 Dt = 20
-n_walk = 120
+n_walk = 200
 v = 1
 walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
 grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
@@ -1529,10 +1524,10 @@ color_p = sns.color_palette(palette = 'colorblind', n_colors = len(erd_reny.node
 plt.figure(figsize = (8,6))
 theo_evo = np.array([list(element.values()) for element in theo_occupations])
 sim_evo = np.array([list(element.values()) for element in occupations_disc])
-
+print(nx.degree(erd_reny))
 for i in range(len(erd_reny.nodes)):
-    plt.plot(time, sim_evo[:,i], ls = '-.', c = color_p[i])
-    plt.plot(time, theo_evo[:,i]*n_walk, ls = '-', c = color_p[i])
+    plt.plot(time, sim_evo[:,i]/(10*n_walk), ls = '-.', c = color_p[i])
+    plt.plot(time, theo_evo[:,i]/10, ls = '-', c = color_p[i])
 plt.xlabel('time (steps)', fontsize = 18)
 plt.ylabel('Occupation probabilities', fontsize = 18)
 plt.xticks(fontsize = 18)
@@ -1565,15 +1560,15 @@ import csv
 n_walk = 20
 v = 1
 times = np.linspace(0.1, 201.1, 300)
-
-with open('/Users/robertbenassai/Documents/UOC/PBC_01_ratio_evolution.csv', 
+with open('/Users/robertbenassai/Documents/UOC/RG_ratio_evolution.csv', 
           'w') as file1:
     writer = csv.writer(file1)
-    with open('/Users/robertbenassai/Documents/UOC/PBC_01_abs_avg_flow.csv', 
+    with open('/Users/robertbenassai/Documents/UOC/RG_abs_avg_flow.csv', 
               'w') as file2:
         writer2 = csv.writer(file2)
         for Dt in times:
-            walked_ER, paths = node_centric(PBC_lattice.copy(), Dt, v, pos_PBC, n_walk)
+            print(Dt)
+            walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
             grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
             
             edge_graph = nx.get_edge_attributes(walked_ER, 'edge_visits')
@@ -1585,13 +1580,14 @@ with open('/Users/robertbenassai/Documents/UOC/PBC_01_ratio_evolution.csv',
             weight_s = np.sum(np.square(ws))/np.sum(np.square(w))
             weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
             
+            mean_tot = np.mean(np.array(list(edge_graph.values()))**2)
             mean_g = np.mean(np.array(list(grad_ER.values()))**2)
             mean_s = np.mean(np.array(list(sol_ER.values()))**2)
             mean_h = np.mean(np.array(list(har_ER.values()))**2)
             mean_cycl = np.mean((np.array(list(har_ER.values()))+\
                                  np.array(list(sol_ER.values())))**2)
             writer.writerow([Dt, weight_g, weight_s, weight_h])
-            writer2.writerow([Dt, mean_g, mean_s, mean_h, mean_cycl])
+            writer2.writerow([Dt, mean_g, mean_s, mean_h, mean_cycl, mean_tot])
         
 #%%read the results from a file
 
@@ -1603,12 +1599,13 @@ mean_abs_g = []
 mean_abs_s = []
 mean_abs_h = []
 mean_abs_cycl = []
+mean_abs_tot = []
 times = []
 times2 = []
 
-with open('/Users/robertbenassai/Documents/UOC/PBC_01_ratio_evolution.csv', 'r') \
+with open('/Users/robertbenassai/Documents/UOC/ER_50_01_ratio_evolution.csv', 'r') \
     as file:
-        with open('/Users/robertbenassai/Documents/UOC/PBC_01_abs_avg_flow.csv', 
+        with open('/Users/robertbenassai/Documents/UOC/ER_50_01_abs_avg_flow.csv', 
               'r') as file2:
             reader = csv.reader(file, delimiter=',')
             reader2 = csv.reader(file2, delimiter = ',')
@@ -1624,6 +1621,7 @@ with open('/Users/robertbenassai/Documents/UOC/PBC_01_ratio_evolution.csv', 'r')
                 mean_abs_s.append(float(row2[2]))
                 mean_abs_h.append(float(row2[3]))
                 mean_abs_cycl.append(float(row2[4]))
+                mean_abs_tot.append(float(row2[5]))
 #%%
 from scipy.optimize import curve_fit
 def func(x, a, b):
@@ -1635,60 +1633,137 @@ def func2(x, a):
     return y
 params, pcov = curve_fit(func, times[100:], weight_ls_g[100:])
 #%% PLOT OF STRENGTH EVOLUTION
-st_ratio_g, st_ratio_s, st_ratio_h = structural_ratios(PBC_lattice)
+# st_ratio_g, st_ratio_s, st_ratio_h = structural_ratios(PBC_lattice)
 
-plt.figure()
+perr_weights = np.sqrt(np.diag(pcov))
+
+plt.figure(figsize= (10,8))
 plt.loglog(times, weight_ls_g, color = 'b' , linestyle = '-', marker = '.', 
-         label = 'gradient strength ratio')
+         label = 'Gradient strength ratio')
 plt.loglog(times, np.array(weight_ls_s) + np.array(weight_ls_h), color = 'r', 
-         linestyle = '-', marker = '.', label = 'cyclic strength ratio')
+         linestyle = '-', marker = '.', label = 'Cyclic strength ratio')
+
 # plt.hlines(st_ratio_g, 0, 400, color = 'b' , linestyle = '--', label = 'gradient structural ratio')
 # plt.hlines((st_ratio_h+st_ratio_s), 0, 400, color = 'r', linestyle = '--', 
 #             label = 'cyclic structural ratio')
-plt.loglog(times[40:], params[1]*times[40:]**params[0], 'b--', label = r'$y = t^{'+
-            str(round(params[0], 2))+'}$')
-plt.loglog(times[40:], 1-params[1]*times[40:]**params[0], 'r--', label = r'$y = 1 - t^{'+
-            str(round(params[0],2))+'}$')
-plt.xlabel('Simulation time')
-plt.ylabel('Strength Ratio')
-# plt.tight_layout()
-plt.legend(loc='upper center', ncol = 2, bbox_to_anchor=(0.5, 1.18))
+plt.loglog(times[5:], params[1]*times[5:]**params[0], 'b--', label = r'$y = t_1^{'+
+            str(round(params[0], 2))+'\pm'+str(round(perr_weights[0], 2))+'}$')
+plt.loglog(times[5:], 1-params[1]*times[5:]**params[0], 'r--', label = r'$y = 1 - t_1^{'+
+            str(round(params[0],2))+'\pm'+str(round(perr_weights[0], 2))+'}$')
+plt.xlabel(r'Final simulation time $(t_1)$', fontsize = 22)
+plt.ylabel('Strength Ratio', fontsize = 22)
+plt.xticks(fontsize = 20)
+plt.yticks(fontsize = 20)
+plt.legend(loc='upper center', ncol = 2, bbox_to_anchor=(0.5, 1.15), 
+           fontsize = 20, framealpha=1)
+plt.tight_layout()
+
 perr = np.sqrt(np.diag(pcov))
 print(perr)
 
 #%% PLOT MEAN SQUARED FLOW
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
+
 params_cycl, pcov_cycl = curve_fit(func, times2, np.array(mean_abs_cycl))
-params_tot, pcov_tot = curve_fit(func, times2, np.array(mean_abs_h)+np.array(mean_abs_s))
+params_tot, pcov_tot = curve_fit(func, times2, np.array(mean_abs_tot))
 params_g, pcov_g = curve_fit(func2, times2[100:], mean_abs_g[100:])
 
 perr_cycl = np.sqrt(np.diag(pcov_cycl))
 perr_tot = np.sqrt(np.diag(pcov_tot))
 print(perr_cycl)
 
-plt.figure()
-plt.loglog(times2, mean_abs_g, color = 'b' , linestyle = '-', marker = '.', 
-         label = 'mean squared gradient component')
-plt.loglog(times2, np.array(mean_abs_cycl), color = 'r', 
-         linestyle = '-', marker = '.', label = 'mean squared solenoidal component')
-# plt.plot(times2, np.array(mean_abs_s)+np.array(mean_abs_s), 
-#           color = 'g',linestyle = '-', marker = '.', label = 'harmonic mean squared flow')
+fig, ax = plt.subplots(figsize = (10,8))
+ax.plot(times2, mean_abs_g, color = 'b' , linestyle = '-', marker = '.', 
+         label = r'$\left< \omega_g^2 \right >$')
+ax.plot(times2, np.array(mean_abs_cycl), color = 'r', 
+         linestyle = '-', marker = '.', label = r'$\left< \omega_{cycl}^2 \right >$')
+ax.plot(times2, np.array(mean_abs_tot), color = 'g', 
+          linestyle = '-', marker = '.', label =  r'$\left< \omega_{tot}^2 \right >$')
 
-plt.loglog(times2, func2(np.array(times2), params_g[0]), 'b--', 
-         label = r'$\left < \omega^2 \right > ='+str(round(params_g[0], 2))+'$')
-plt.loglog(times2, func(np.array(times2), params_cycl[0], params_cycl[1]), 'r--', 
-           label = r'$\left < \omega^2 \right > = \:('+str(round(params_cycl[1],2))+
-           '\pm'+str(round(perr_cycl[1],2))+') t^{'+str(round(params_cycl[0],2))+
+ax.plot(times2, func2(np.array(times2), params_g[0]), 'b--', 
+         label = r'$\left < \omega^2_g \right > = 'f'{params_g[0]:.2f}'+ 
+         '\pm 'f'{perr_tot[0]:.1}'+'$')
+ax.plot(times2, func(np.array(times2), params_cycl[0], params_cycl[1]), 'r--', 
+           label = r'$\left < \omega^2_{cycl} \right > = \:('f'{params_cycl[1]:.0f}'+
+           '\pm 'f'{perr_cycl[1]:.0f})' + 't_1^{'+str(round(params_cycl[0],2))+
            '\pm'+str(round(perr_cycl[0],2))+'}$')
 
-# plt.plot(times2, func(np.array(times2), params_tot[0], params_tot[1]), 'g--', 
-#            label = r'$\left < \omega^2 \right > = \:('+str(round(params_tot[1],2))+
-#            '\pm'+str(round(perr_tot[1],2))+') t^{'+str(round(params_tot[0],2))+
-#            '\pm'+str(round(perr_tot[0],2))+'}$')
+ax.plot(times2, func(np.array(times2), params_tot[0], params_tot[1]), 'g--', 
+            label =r'$\left < \omega^2_{cycl} \right > = \:('f'{params_tot[1]:.0f}'+
+            '\pm 'f'{perr_tot[1]:.0f})' + 't_1^{'+str(round(params_tot[0],2))+
+            '\pm'+str(round(perr_tot[0],2))+'}$')
+
 # func(np.array(times2), params_cycl[0])
-plt.xlabel(r'$\Delta t$')
-plt.ylabel(r'$\left < \omega^2 \right >$')
-plt.legend()
+ax.set_xlabel(r'Final simulation time $(t_1)$', fontsize = 22)
+ax.set_ylabel(r'$\left < \omega^2 \right >$', fontsize = 22)
+# plt.xticks(fontsize = 20)
+# plt.yticks(fontsize = 20)
+ax.tick_params(labelsize = 20)
+plt.legend(loc = 'upper center', bbox_to_anchor=(0.5, 1.15), fontsize = 18, 
+           ncols = 2, framealpha=1)
 plt.tight_layout()
+#%%
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
+
+# Create the figure and axes
+fig, ax = plt.subplots(figsize=(10, 8))
+
+# Plot the main data
+ax.plot(times2, mean_abs_g, color='b', linestyle='-', marker='.', label=r'$\left< \omega_g^2 \right >$')
+ax.plot(times2, np.array(mean_abs_cycl), color='r', linestyle='-', marker='.', label=r'$\left< \omega_{cycl}^2 \right >$')
+ax.plot(times2, np.array(mean_abs_tot), color='g', linestyle='-', marker='.', label=r'$\left< \omega_{tot}^2 \right >$')
+
+# Fit the data and plot the fitted curves
+ax.plot(times2, func2(np.array(times2), params_g[0]), 'b--',
+         label=r'$\left < \omega^2_g \right > =' + str(round(params_g[0], 2)) +
+               '\pm' + str(round(perr_tot[0], 2)) + '$')
+ax.plot(times2, func(np.array(times2), params_cycl[0], params_cycl[1]), 'r--',
+         label=r'$\left < \omega^2_{cycl} \right > = \:(' + str(round(params_cycl[1], 2)) +
+               '\pm' + str(round(perr_cycl[1], 2)) + ') \Delta t^{' + str(round(params_cycl[0], 2)) +
+               '\pm' + str(round(perr_cycl[0], 2)) + '}$')
+ax.plot(times2, func(np.array(times2), params_tot[0], params_tot[1]), 'g--',
+         label=r'$\left < \omega^2_{tot} \right > = \:(' + str(round(params_tot[1], 2)) +
+               '\pm' + str(round(perr_tot[1], 2)) + ') \Delta t^{' + str(round(params_tot[0], 2)) +
+               '\pm' + str(round(perr_tot[0], 2)) + '}$')
+
+ax.set_xlabel(r'$\Delta t$', fontsize=22)
+ax.set_ylabel(r'$\left < \omega^2 \right >$', fontsize=22)
+ax.tick_params(labelsize=20)
+
+# Create the zoom-in axes
+ax_zoom = zoomed_inset_axes(ax, zoom=6, loc='center right', bbox_to_anchor=(1500, 900))
+
+
+# Plot the zoomed-in region
+ax_zoom.plot(times2, mean_abs_g, color='b', linestyle='-', marker='.', label=r'$\left< \omega_g^2 \right >$')
+ax_zoom.plot(times2, np.array(mean_abs_cycl), color='r', linestyle='-', marker='.', label=r'$\left< \omega_{cycl}^2 \right >$')
+ax_zoom.plot(times2, np.array(mean_abs_tot), color='g', linestyle='-', marker='.', label=r'$\left< \omega_{tot}^2 \right >$')
+
+# Fit the data and plot the fitted curves
+ax_zoom.plot(times2, func2(np.array(times2), params_g[0]), 'b--',
+         label=r'$\left < \omega^2_g \right > =' + str(round(params_g[0], 2)) +
+               '\pm' + str(round(perr_tot[0], 2)) + '$')
+ax_zoom.plot(times2, func(np.array(times2), params_cycl[0], params_cycl[1]), 'r--',
+         label=r'$\left < \omega^2_{cycl} \right > = \:(' + str(round(params_cycl[1], 2)) +
+               '\pm' + str(round(perr_cycl[1], 2)) + ') \Delta t^{' + str(round(params_cycl[0], 2)) +
+               '\pm' + str(round(perr_cycl[0], 2)) + '}$')
+ax_zoom.plot(times2, func(np.array(times2), params_tot[0], params_tot[1]), 'g--',
+         label=r'$\left < \omega^2_{tot} \right > = \:(' + str(round(params_tot[1], 2)) +
+               '\pm' + str(round(perr_tot[1], 2)) + ') \Delta t^{' + str(round(params_tot[0], 2)) +
+               '\pm' + str(round(perr_tot[0], 2)) + '}$')
+
+# Set the limits for the zoom-in region
+ax_zoom.set_xlim(0, 40)
+ax_zoom.set_ylim(0, 100)
+
+# Mark the zoomed-in region in the main plot
+mark_inset(ax, ax_zoom, loc1=2, loc2=4, fc="none", ec="0.5", clip_on = True)
+ax_zoom.set_aspect(4/10)
+
+# Add legends
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), fontsize=18, ncols=2, framealpha=1)
+plt.tight_layout()
+
 
 #%%EVOLUTION OF GRADIENT AND CYCLIC FLOW
 
@@ -1960,7 +2035,7 @@ ax[0].set_title('Original', fontsize=25)
 
 # Draw nodes and edges
 nx.draw_networkx_nodes(erd_reny, pos=pos_ER, ax=ax[0], **common_params)
-nx.draw_networkx_edges(erd_reny, pos=pos_ER, width=2, arrowstyle="-|>", 
+nx.draw_networkx_edges(erd_reny, pos=pos_ER, width=2, arrowsize = 20, arrowstyle="-|>", 
                        connectionstyle="arc3,rad=0.0", ax=ax[0], node_size=node_size)
 
 # Draw labels and edge labels
@@ -2221,6 +2296,9 @@ PBC_lattice = nx.DiGraph(PBC_lattice)
 out_edges = [edge for edge in PBC_lattice.edges if edge[0]
     > edge[1]]  # removing all outward edges
 PBC_lattice.remove_edges_from(out_edges)
+
+nx.draw_networkx(PBC_lattice, pos=pos_PBC, with_labels=True, node_size=30)
+
 #%%
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
@@ -2292,7 +2370,7 @@ for i in range(200):
 #%%   HISTOGRAMS
 from scipy.stats import norm, poisson
 
-trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v)#, new_edges_rel, 1, 1)
+trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, new_edges_rel, 1, 1)
 PBC_th, solution_PBC, _ = solve_continuous_rw_flow(PBC_lattice.copy(), trans_rate_PBC_nc, Dt, n_walk)
 g_PBC_th, s_PBC_th, h_PBC_th, pot_PBC_th, div_PBC_th = \
     hodge_decomposition(PBC_th, 'edge_visits')
@@ -2302,7 +2380,7 @@ def fit_function(k, lamb):
     return poisson.pmf(k, lamb)
 
 n_bins = 32-19
-edge = (28,29)
+edge = (65,69)
 hist_ls_g = [comp[edge] for comp in grad_comp_list]
 hist_ls_s = [comp[edge] for comp in sol_comp_list]
 hist_ls_h = [comp[edge] for comp in har_comp_list]
@@ -2333,7 +2411,7 @@ ax[0].axvline(g_PBC_th[edge], 0, 25, linestyle = '--', color = 'black',
               label = 'Analytical : '+str(round(g_PBC_th[edge], 3)))
 ax[0].set_xlabel(r'$\omega_g$', fontsize = 12)
 ax[0].set_ylabel('frequency', fontsize = 12)
-ax[0].plot(x_poiss, fit_function(x_poiss, *parameters), 'r-', label = r'$\mu=%.3f,\ \sigma=%.3f$' %(mu_g, sigma_g))
+ax[0].plot(bins_g, y_g, 'r-', label = r'$\mu=%.3f,\ \sigma=%.3f$' %(mu_g, sigma_g))
 ax[0].legend(loc = 'upper center', bbox_to_anchor = (0.5, 1.25))
 
 

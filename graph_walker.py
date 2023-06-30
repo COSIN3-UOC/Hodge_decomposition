@@ -242,109 +242,6 @@ print(graph.edges(a))
 print(np.where(a_dists/2 < 0.3))
 print(graph.nodes[a]['pos'])
 # %% NODE_WALKERS (walk during Dt) (time/n_wak = 25s for clusters of 100 points)
-'''Function that puts n = len(list(G.nodes)) random walkers in a Digraph
-transitable in both directions and moves them during Dt time. The walkers always
-move until they are not able to go anywhere else with the time left'''
-
-'''G: nx.DiGraph
-   Dt: Maximum moving time
-   v: velocity of the walkers
-   pos: dictionary with positions of each node in the DiGraph {node:(posx,pos_y)}
-   n_walk: number of realisations of the random walk during Dt max time'''
-
-
-# def node_walkers(G, Dt, v, pos, n_walk):
-#     # calculating the time intrinsec to each edge
-#     delta_t = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
-#             for edge in G.edges}
-#     nx.set_edge_attributes(G, delta_t, name='dt')
-#     # upper bound for steps
-#     min_edge_time = min(nx.get_edge_attributes(G, 'dt').values())
-#     max_steps = int(Dt/min_edge_time)
-#     print('maximum steps allowed each realisation', max_steps)
-#     # overall_node/edge_weights account for all the edge/node passings summed for
-#     # n_walk iterations
-#     # overall_node_weights= {node:0 for node in list(G.nodes)}
-#     overall_edge_weights = {edge: 0 for edge in list(G.edges)}
-#     for i in range(0, n_walk):
-#         print('realisation '+str(i+1)+'/'+str(n_walk))
-#         # path = []
-#         initial_nodes = sorted(list(G.nodes))
-#         # path stores the position of each walker in each time step
-#         # path.append(initial_nodes)
-#         # weights/edge_weights counts the amount of times a walker has visited
-#         # each node/edge in 1 realisation
-#         # weights = {i_node:path[0].count(i_node) for i_node in list(G.nodes)}
-#         edge_weights = {i_edge: 0 for i_edge in list(G.edges)}
-#         # first let's difine the time used for each walker
-#         time = np.zeros(len(initial_nodes))
-#         last_time = np.copy(time)  # just for checking
-#         # will store the position
-#         final_nodes = np.copy(np.array(initial_nodes))
-#         # of the walkers after 1 step
-#         # 1 step moves (or tries to move according to time left) all the walkers
-#         # through a neighboring edge
-#         for step in range(max_steps):
-#             # list of neighboring nodes of each walker
-#             neighbors = [{n: (G[walker][n]['dt'] if (walker, n) in list(G.edges)
-#                           else G[n][walker]['dt']) for n in
-#                           nx.all_neighbors(G, walker)} for walker in initial_nodes]
-# #            print(neighbors)
-#             # now randomly move the random walker to another node only if time+edge_time
-#             # is < Dt
-#             ind = 0
-#             # checks how many walkers have nowhere left to go
-#             ended_walkers = 0
-#             # print(step)
-#             for goto_nodes in neighbors:
-#                 # time of each possible edge for a given node
-
-#                 if np.any(time[ind] + np.array(list(goto_nodes.values())) <= Dt):
-#                     possible_nodes = [k for k in goto_nodes.keys() if
-#                                       (goto_nodes[k]+time[ind]) <= Dt]
-#                     sel = random.choice(possible_nodes)
-#                     final_nodes[ind] = sel
-#                 else:
-#                     # print(time[ind])
-#                     ended_walkers += 1
-#                 ind += 1
-#             time = [t+G[initial_nodes[j]][final_nodes[j]]['dt'] if
-#                     (initial_nodes[j], final_nodes[j]) in list(G.edges) else
-#                     t+G[final_nodes[j]][initial_nodes[j]]['dt'] if
-#                     (final_nodes[j], initial_nodes[j]) in list(G.edges) else t
-#                     for j, t in enumerate(time)]
-#             # print(time)
-#             # path.append(np.copy(final_nodes))
-#             # counting edge visits according to direction of edge
-#             for node_i, node_f in zip(initial_nodes, final_nodes):
-#                 if node_i != node_f:
-#                     if (node_i, node_f) in list(G.edges):
-#                         edge_weights[(node_i, node_f)] += 1
-#                     elif (node_f, node_i) in list(G.edges):
-#                         edge_weights[(node_f, node_i)] -= 1
-#                     else:
-#                         print('ini different than final but edge not in graph')
-#             # count the occutpation of each node after the moves
-#             # for node_i, node_f in zip(initial_nodes, final_nodes):
-#             #     if node_i != node_f:
-#             #         weights[node_i] += 1
-
-#             initial_nodes = np.copy(final_nodes)
-#             if ended_walkers == len(initial_nodes):
-#                 print((np.array(time) == last_time).all())
-#                 print('all walkers finished, steps needed for this realisation '
-#                       + str(step)+'/'+str(max_steps))
-#                 break
-#             last_time = np.copy(np.array(time))
-#         for edge in G.edges:
-#             overall_edge_weights[edge] += edge_weights[edge]
-#     #     for node in G.nodes:
-#     #         overall_node_weights[node] += weights[node]
-#     #     #set node value as the number of visits of each value
-#     #     # print(weights)
-#     # nx.set_node_attributes(G, overall_node_weights, name='weights')
-#     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
-#     return(G)
 
 
 # %% OPTIMIZED NODE_WALKERS (time/n_wak = 11s for clusters of 100 points)
@@ -785,6 +682,9 @@ g = nx.DiGraph()
 g.add_nodes_from([0, 1, 2, 3, 4])
 g.add_edges_from([(0, 1), (0, 2), (1, 2), (1, 3), (2, 3), (3, 4), (0, 4)])
 attr = {(0, 1): 3, (0, 2): 3, (1, 2): 2, (1, 3): 1, (2, 3): 1, (3, 4): -2, (0, 4): 1}
+# g.add_edges_from([(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)])
+# attr = {(0, 1): 3, (0, 2): 3, (1, 2): 2, (1, 3): 1, (2, 3): 1}
+
 # line
 # g.add_nodes_from([0, 1, 2, 3])
 # g.add_edges_from([(0,1), (1,2), (2,3)])
@@ -801,11 +701,20 @@ har_comp = {comp: round(har_comp[comp], 2) for comp in har_comp.keys()}
 pos = nx.planar_layout(g)
 # pos = nx.spring_layout(g, k = 0.7)
 # pos = {0: (0,0), 1: (1,0), 2: (1,1), 3: (0,1)}
+node_size = 500
+nx.draw_networkx_nodes(g, pos=pos, node_size=node_size,
+                 node_color='#AED0EE', linewidths = 1.5, edgecolors = 'black')
+nx.draw_networkx_edges(g, pos=pos, width=1.5, arrowsize = 20, node_size=node_size,
+                 arrowstyle = '-|>', connectionstyle='arc3,rad=0.0')
 
-nx.draw_networkx(g, pos=pos, with_labels=True, node_size=250, font_size=15,
-                 node_color='#AED0EE')
+nx.draw_networkx_labels(g, pos, labels=None, font_size=15, font_color='k', 
+                        font_family='sans-serif', font_weight='normal',
+                        alpha=None, bbox=None, horizontalalignment='center',
+                        verticalalignment='center_baseline', ax=None, clip_on=True)
+
 nx.draw_networkx_edge_labels(g, pos=pos, edge_labels=attr,
                              rotate=False, font_size=15)
+
 plt.axis('off')
 # %%
 node_size = 400
@@ -909,7 +818,7 @@ for ax, title, edge_labels in zip(
 
     # Draw nodes and edges
     nx.draw_networkx_nodes(g, pos=pos, ax=ax, **common_params)
-    nx.draw_networkx_edges(g, pos=pos, width=2, arrowstyle="-|>", 
+    nx.draw_networkx_edges(g, pos=pos, width=2, arrowsize = 20, arrowstyle="-|>", 
                            connectionstyle="arc3,rad=0.0", ax=ax, node_size=node_size)
 
     # Draw labels and edge labels
@@ -2654,6 +2563,51 @@ ax.set_ylim([-0.1, 1.1])
 
 # Remove title
 ax.set_title('')
+
+# Remove x and y ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set aspect ratio
+ax.set_aspect('equal')
+
+# Display the plot
+plt.show()
+#%% HARMONIC HELMHOLTZ
+import numpy as np
+import matplotlib.pyplot as plt
+
+N = 100
+
+# Create lattice grid
+grid_size = int(np.sqrt(N))
+x, y = np.meshgrid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size))
+
+# Flatten the grid coordinates
+x = x.flatten()
+y = y.flatten()
+
+# Set flow vectors
+u = np.ones_like(x)  # Set all x-components of flow vectors to 1
+v = np.zeros_like(y)  # Set all y-components of flow vectors to 0
+
+# Set fixed arrow length
+arrow_length = 0.1
+
+# Scale the flow vectors to the fixed length
+u_scaled = u * arrow_length
+v_scaled = v * arrow_length
+
+# Create the quiver plot
+fig, ax = plt.subplots()
+ax.quiver(x, y, u_scaled, v_scaled, angles='xy', scale_units='xy', scale=1, color='black')
+
+# Set axis limits
+ax.set_xlim([-0.05, 1.13])
+ax.set_ylim([-0.1, 1.1])
+
+# Remove title
+ax.set_title('HARMONIC VECTOR FIELD', fontsize = 20)
 
 # Remove x and y ticks
 ax.set_xticks([])
