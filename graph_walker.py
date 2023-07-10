@@ -1310,10 +1310,7 @@ for edge in del_dg.edges:
 del_dg.remove_edges_from(remove)
 plt.figure()
 nx.draw_networkx(del_dg, pos=pointIDXY, with_labels=False, node_size=10)
-# for node in del_dg.nodes:
-#     print(node, 'neighbours',list(del_dg.predecessors(node))+list(del_dg.successors(node)))
-#     if len(list(del_dg.predecessors(node))+list(del_dg.successors(node))) == 0:
-#         print('no neigbours')
+
 Dt = 100
 v = 0.1
 n_walk = 1

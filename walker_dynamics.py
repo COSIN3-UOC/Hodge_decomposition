@@ -1338,8 +1338,8 @@ def plot_pot_corr(pot_sim, pot_theo, x_label, y_label):
     plt.xticks(fontsize = 18)
     plt.yticks(fontsize = 18)
     plt.scatter(x, y, s = 18)
-    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-             +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' 
+    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = 'f'{a:.2f}'+r'$\pm$'
+             +''f'{std_err:.2f}'+'x + 'f'{b:0.1f}'+'\n'+r'$r^2 = $' 
              +str(round(r_value**2, 2)))
     plt.plot(x, np.array(x), c='r', label = 'y = x')
     plt.legend(fontsize = 18)
@@ -1356,9 +1356,9 @@ def plot_grad_corr(grad_sim, grad_theo, x_label, y_label):
     plt.xticks(fontsize = 20)
     plt.yticks(fontsize = 20)
     plt.scatter(x, y, s = 18)
-    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = '+str(round(a,2))+r'$\pm$'
-             +str(round(std_err,2))+'x +'+str(round(b, 2))+'\n'+r'$r^2 = $' +
-             str(round(r_value**2, 2)))
+    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = 'f'{a:.2f}'+r'$\pm$'
+             +''f'{std_err:.2f}'+'x + 'f'{b:0.1f}'+'\n'+r'$r^2 = $' 
+             +str(round(r_value**2, 2)))
     plt.plot(x, np.array(x), c='r', label = 'y = x')
     plt.legend(fontsize = 18)
     plt.tight_layout()
@@ -1391,7 +1391,7 @@ nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
 
 #%% Random Geometric
 # Use seed when creating the graph for reproducibility
-G = nx.random_geometric_graph(10, 0.47, seed=1000)
+G = nx.random_geometric_graph(50, 0.2, seed=1000)
 # position is stored as node attribute data for random_geometric_graph
 pos_ER = nx.get_node_attributes(G, "pos")
 # transforming the graph into a digraph
@@ -1419,7 +1419,7 @@ nx.draw_networkx_edges(erd_reny, pos=pos_ER, width=2, arrowstyle="-|>",
 
 #SIM DISCR
 steps = 100
-n_walk = 200
+n_walk = 120
 
 discr_walk_ER, occupations_disc = digraph_walkers(erd_reny.copy(), steps, n_walk)
 
@@ -1442,7 +1442,7 @@ plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component',
                'Analytical gradient component')
 #%% NODE-CENTRIC WALK
 Dt = 20
-n_walk = 200
+n_walk = 120
 v = 1
 walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
 grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
