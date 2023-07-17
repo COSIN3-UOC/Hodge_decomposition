@@ -19,6 +19,7 @@ import random
 import numpy as np
 import seaborn as sns
 import csv
+import hodge_dec.hodge_decomposition as hd
 # %% WALKERS ON A DIRECTED GRAPH (walk during amount of steps)
 from collections import Counter
 '''
@@ -950,201 +951,43 @@ def solve_continuous_rw_flow(G:nx.DiGraph, trans_rates:np.array, Dt:float, n_wal
     inode_to_iarr = {node:i for i, node in enumerate(G_und.nodes)}
     #array of flows through the edges
     net_flow = np.zeros(np.shape(trans_rates))
+    stat_flow = np.zeros(np.shape(trans_rates))
     #initial probabilities
     p0 = np.ones(len(G.nodes))
     
     t = np.linspace(start=0, stop=Dt,num=20000)
     sol = odeint(func=dp_dt, y0=p0, t=t, args = (trans_rates, None))
-    _, tri_dict = find_triangles(G)
-    prob_product = []
-    for triangle in tri_dict.keys():
-        i = triangle[0]
-        j = triangle[1]
-        k = triangle[2]
-        prob_product.append(sol[:,i]*sol[:,j]*sol[:,k]*(trans_rates[i][j]*\
-        trans_rates[j][k]*trans_rates[k][i] - trans_rates[j][i]*\
-        trans_rates[k][j]*trans_rates[i][k]))
+    # _, tri_dict = find_triangles(G)
+    # prob_product = []
+    # for triangle in tri_dict.keys():
+    #     i = triangle[0]
+    #     j = triangle[1]
+    #     k = triangle[2]
+    #     prob_product.append(sol[:,i]*sol[:,j]*sol[:,k]*(trans_rates[i][j]*\
+    #     trans_rates[j][k]*trans_rates[k][i] - trans_rates[j][i]*\
+    #     trans_rates[k][j]*trans_rates[i][k]))
     
-    prob_prod_arr = np.transpose(np.array(prob_product))
+    # prob_prod_arr = np.transpose(np.array(prob_product))
     #INTEGRATION
     #The transition rates are constant, thus the integral (p_i*R_{ij} - p_j*R_{ji}) can
     #be computed by first integrating the p's and then doing the calculations
     flows = np.trapz(sol, t, axis=0)
-    curls = np.trapz(prob_prod_arr, t, axis=0)
+    # curls = np.trapz(prob_prod_arr, t, axis=0)
+    stationary_probs = sol[-1][:]
     for j, p_j in enumerate(flows):
         
         for i in range(len(G.nodes)):
             net_flow[i,j] += flows[i]*trans_rates[j][i] - p_j*trans_rates[i][j]
+            stat_flow[i,j] = stationary_probs[i]*trans_rates[j][i] - \
+            stationary_probs[j]*trans_rates[i][j]
+            
 
     net_flow *= n_walk
     cont_new = {edge: net_flow[inode_to_iarr[edge[0]]][inode_to_iarr[edge[1]]] 
                 for edge in G.edges}
     nx.set_edge_attributes(G, cont_new, name = 'edge_visits')
-    return(G, sol, curls)
+    return(G, sol, stat_flow)#, curls)
 
-# %% HODGE DECOMPOSITION FUNCTION
-
-def hodge_decomposition(G, attr_name):
-
-# vector of the edge attribute considered where each component is the value of the
-# attr of a given edge
-    g_field = np.transpose(np.array([G[edge[0]][edge[1]][attr_name] for edge
-                                     in G.edges]))
-
-# Computing divergence
-    div = {node: 0 for node in G.nodes}
-
-    for node in G.nodes:
-        for in_edge in G.in_edges(node):
-            div[node] -= G[in_edge[0]][in_edge[1]][attr_name]
-        for out_edge in G.out_edges(node):
-            div[node] += G[out_edge[0]][out_edge[1]][attr_name]
-    nx.set_node_attributes(G, div, name='div')
-
-# GRADIENT OPERATOR
-    grad_arr = []
-    for edge in G.edges:
-        row = []
-        for node in G.nodes:
-            if edge[1] == node:
-                row.append(1)
-            elif edge[0] == node:
-                row.append(-1)
-            else:
-                row.append(0)
-        grad_arr.append(row)
-        row = []
-    grad_arr = np.array(grad_arr)
-    # print('gradient op\n',grad_arr)
-# LAPLACIAN MATRIX
-    lap = np.transpose(grad_arr).dot(grad_arr)
-    # print('checking solvability',np.linalg.cond(lap))
-    # OBTAINING THE GRADIENT COMPONENT
-    # compute the pseudo inverse of the laplacian to solve the syst of equations
-    # computationally intensive for large problems
-    Apinv = np.linalg.pinv(lap)
-    # apply the pseudo-inverse to the rhs vector to obtain the `solution'
-    div_arr = np.transpose(np.array(list(div.values())))
-    # print('divergence\n',div_arr)
-
-    pot_field = np.squeeze(np.asarray(Apinv.dot(-div_arr)))
-    # print('error in node potentials', lap.dot(pot_field)+div_arr)
-    # gradient of the potential field
-    # pot_field.insert(remove_index, 0)
-    pot_nodes = {n: pot for n, pot in zip(G.nodes, pot_field)}
-    # print('node potentials', pot_nodes)
-    grad_comp_arr = np.transpose(grad_arr.dot(pot_field))
-    grad_comp = {edge: grad_comp_arr[i] for i, edge in enumerate(G.edges)}
-# SOLENOIDAL COMPONENT
-# Calculating the edge-2 matrix or oriented-face incidence matrix which
-# corresponds to the curl operator
-    n_tri, tri_dict = find_triangles(G)
-    # print('number of triangles', n_tri)
-    if n_tri != 0:
-        curl_op = []
-        # creating the curl operator:
-        for triangle in tri_dict.keys():
-            row = []
-            for edge in G.edges:
-#                print(triangle)
-                if (triangle[1] == min(edge) and triangle[2] == max(edge)) or\
-                (triangle[0] == min(edge) and triangle[1] == max(edge)):
-                    if edge[0] < edge[1]:
-                        row.append(1)
-                    else:
-                        row.append(-1)
-                elif triangle[0] == min(edge) and triangle[2] == max(edge):
-                    if edge[0] < edge[1]:
-                        row.append(-1)
-                    else:
-                        row.append(1)
-                else:
-                    row.append(0)
-
-#            print(row, tri_dict[triangle], list(G.edges))
-            curl_op.append(row)
-
-    # Caclulating the delta1 delta1* matrix (rot_arr) (using levi Chivita tensor
-    # a la Hodge Tutorial)
-        # rot_arr = []
-        # for row_el in tri_dict.keys():
-        #     row = []
-        #     for col_el in tri_dict.keys():
-        #         if col_el == row_el:
-        #             row.append(3)
-        #         elif len(set(row_el).symmetric_difference(col_el)) == 2:
-        #             # returns all items in both sets but not the ones that are in both sets
-        #             diff = list(set(row_el).symmetric_difference(col_el))
-        #             c_mod = [diff[0] if x==diff[1] else diff[1] if x==diff[0]
-        #                      else x for x in row_el]
-        #             c = sorted(c_mod)
-
-        #             row.append(int(LeviCivita(c_mod.index(c[0]),c_mod.index(c[1])
-        #                                       ,c_mod.index(c[2]))))
-        #         elif len(set(row_el).symmetric_difference(col_el)) > 2:
-        #             row.append(0)
-        #     rot_arr.append(row)
-        # rot_arr = np.array(rot_arr)
-        curl_op = np.array(curl_op)
-        # print(rot_arr)
-        rot_arr_inv = np.linalg.pinv(curl_op.dot(
-            np.transpose(curl_op))).dot(curl_op)
-
-#        print(curl_op)
-        # computing the curl of the graph
-        rot = curl_op.dot(g_field)
-        # print('big rot arr\n',curl_op.dot(np.transpose(curl_op)))
-        # print('curl_op',curl_op)
-        # print('field',g_field)
-        # print('solvability of curl comp', np.linalg.cond(rot_arr))
-        # rot_pinv = np.linalg.pinv(rot_arr)
-
-        # solving the system of equations
-        tri_pot = rot_arr_inv.dot(g_field)
-        # tri_pot = np.squeeze(np.asarray(rot_pinv.dot(rot)))
-        # print('error curl component',
-        #       curl_op.dot(np.transpose(curl_op)).dot(tri_pot)-rot)
-        # solenoidal component is delta1* (transpose of curl op) of the potential:
-        g_s = np.transpose(curl_op).dot(tri_pot)
-        # print('curl of graph', rot)
-        sol_comp = {edge: comp for edge, comp in zip(G.edges, g_s)}
-        # for edge, comp in zip(G.edges, g_s):
-        #     sol_comp[edge] = comp
-    else:
-        g_s = np.transpose(np.zeros(np.shape(grad_comp_arr)))
-        sol_comp = {edge: 0 for edge in G.edges}
-        # for edge in G.edges:
-        #     sol_comp[edge] = 0
-
-# HARMONIC COMPONENT
-
-    if n_tri != 0:
-        big_arr = grad_arr.dot(np.transpose(grad_arr)) +\
-            np.transpose(curl_op).dot(curl_op)
-    else:
-        big_arr = grad_arr.dot(np.transpose(grad_arr))
-#        print(big_arr)
-
-    g_har_vec = g_field - grad_comp_arr - g_s
-    thrs = 10**(-10)
-    if np.all(np.abs(big_arr.dot(g_har_vec)) < thrs):
-
-        har_comp = {edge: har for edge, har in zip(G.edges, g_har_vec)}
-        # for edge, har in zip(G.edges, g_har_vec):
-        #     har_comp[edge] = har
-    else:
-        print('problem in the harmonic component')
-        print('error of the harmonic component', big_arr.dot(g_har_vec))
-        print('max error', np.max(big_arr.dot(g_har_vec)))
-        # print('divergence of the harmonic component',
-        #       grad_arr.dot(np.transpose(grad_arr)).dot(g_har_vec))
-        # print('curl of the harmonic component',
-        #       curl_op.dot(g_har_vec))
-
-        har_comp = {edge: har for edge, har in zip(G.edges, g_har_vec)}
-        # for edge, har in zip(G.edges, g_har_vec):
-        #     har_comp[edge] = har
-    return grad_comp, sol_comp, har_comp, pot_nodes, div
 # %% PLOT HODGE FUNCTION
 
 def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
@@ -1391,7 +1234,7 @@ nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
 
 #%% Random Geometric
 # Use seed when creating the graph for reproducibility
-G = nx.random_geometric_graph(50, 0.2, seed=1000)
+G = nx.random_geometric_graph(70, 0.4, seed=1000)
 # position is stored as node attribute data for random_geometric_graph
 pos_ER = nx.get_node_attributes(G, "pos")
 # transforming the graph into a digraph
@@ -1401,6 +1244,16 @@ out_edges = [edge for edge in erd_reny.edges if edge[1]
 erd_reny.remove_edges_from(out_edges)
 
 nx.draw_networkx(erd_reny, with_labels = False, node_size = 50, pos = pos_ER)
+
+#%%
+dists = np.array([np.linalg.norm(np.array(pos_ER[edge[1]])-np.array(pos_ER[edge[0]]))
+         for edge in erd_reny.edges])
+
+n, bins, _ = plt.hist(dists, bins = 20,range=(0,1))
+bin_width = bins[1] - bins[0]
+# sum over number in each bin and mult by bin width, which can be factored out
+integral = bin_width * sum(n[0:1])
+print(integral)
 #%%
 # Set common styling parameters
 common_params = {
@@ -1418,23 +1271,26 @@ nx.draw_networkx_edges(erd_reny, pos=pos_ER, width=2, arrowstyle="-|>",
 #%% DISCRETE WALK
 
 #SIM DISCR
-steps = 100
-n_walk = 120
+steps = 10
+n_walk = 20
 
 discr_walk_ER, occupations_disc = digraph_walkers(erd_reny.copy(), steps, n_walk)
 
 grad_discr_sim, sol_discr_sim, har_discr_sim, pot_discr_sim, div_discr_sim = \
-    hodge_decomposition(discr_walk_ER, 'edge_visits')
-
+    hd.hodge_decomposition(discr_walk_ER, 'edge_visits')
+    
+hd.plot_hodge(discr_walk_ER, grad_discr_sim, sol_discr_sim, har_discr_sim, 
+              pot_discr_sim, div_discr_sim, pos_ER)
+#%%
 #THEO DISCR
 trans_matrix = build_trans_matrix(erd_reny.copy())
 discr_ER_theo, theo_occupations = discrete_rw_edge_flow(erd_reny.copy(), 
                                                         trans_matrix, steps, n_walk)
 
 grad_discr_th, sol_discr_th, har_discr_th, pot_discr_th, div_discr_th = \
-    hodge_decomposition(discr_ER_theo, 'edge_visits')
+    hd.hodge_decomposition(discr_ER_theo, 'edge_visits')
     
-#%% PLOT OF PREDICTED VS SIMULATED POTENTIALS CTRW
+#%% PLOT OF PREDICTED VS SIMULATED POTENTIALS DTRW
 
 plot_pot_corr(pot_discr_sim, pot_discr_th, 'Simulated Potential', 
               'Analytical Potential')
@@ -1442,21 +1298,24 @@ plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component',
                'Analytical gradient component')
 #%% NODE-CENTRIC WALK
 Dt = 20
-n_walk = 120
+n_walk = 500
 v = 1
-walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
-grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
 
 # THEORETICAL 
-#%%
+
 trans_rate_ER = build_trans_rates_matrix(erd_reny.copy(), pos_ER, v)
 ER_th, solution_ER, curls_ER = solve_continuous_rw_flow(erd_reny.copy(), trans_rate_ER, Dt, n_walk)
-g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new = hodge_decomposition(ER_th, 'edge_visits')
-print(curls_ER)
+g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new = hd.hodge_decomposition(ER_th, 'edge_visits')
+print(np.max(curls_ER))
+#%% SIMULATION
+
+walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
+grad_ER, sol_ER, har_ER, pot_ER, div_ER = hd.hodge_decomposition(walked_ER, 'edge_visits')
 #%%
 plot_hodge(ER_th, g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new,
            pos_ER)
 #%%
+
 plot_hodge(walked_ER, grad_ER, sol_ER, har_ER, pot_ER, div_ER,
            pos_ER)
 #%%
@@ -1569,7 +1428,7 @@ with open('/Users/robertbenassai/Documents/UOC/RG_ratio_evolution.csv',
         for Dt in times:
             print(Dt)
             walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
-            grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
+            grad_ER, sol_ER, har_ER, pot_ER, div_ER = hd.hodge_decomposition(walked_ER, 'edge_visits')
             
             edge_graph = nx.get_edge_attributes(walked_ER, 'edge_visits')
             w = np.array(list(edge_graph.values()))
@@ -1782,7 +1641,7 @@ with open('/Users/robertbenassai/Documents/UOC/ER_50_01_grad_evolution.csv',
             writer3 = csv.writer(file3)
             for Dt in times:
                 walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
-                grad_ER, sol_ER, har_ER, pot_ER, div_ER = hodge_decomposition(walked_ER, 'edge_visits')
+                grad_ER, sol_ER, har_ER, pot_ER, div_ER = hd.hodge_decomposition(walked_ER, 'edge_visits')
                 
                 grad_list = [grad_ER[key] for key in sorted(grad_ER.keys())]
                 sol_list = [sol_ER[key] for key in sorted(sol_ER.keys())]
@@ -1940,6 +1799,7 @@ def solve_adjoint_ctrw_flow(G: nx.DiGraph(), G_adj:nx.Graph, trans_rates:np.arra
         j = edge[1]
         #list of edges in the adjoint graph
         edges_w_flow = list(cont_new_adj.keys())
+        #list of adjacent edges to "edge"
         nbrs_e = [(id_edge, neigh) if (id_edge, neigh) in edges_w_flow else 
                   (neigh, id_edge) for neigh in G_adj.neighbors(id_edge)]
         
@@ -1990,7 +1850,7 @@ def solve_adjoint_ctrw_flow(G: nx.DiGraph(), G_adj:nx.Graph, trans_rates:np.arra
     return(G, sol)
 
 #%%
-erd_reny = nx.erdos_renyi_graph(5, 0.5, seed = 1000, directed=False)
+erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
 erd_reny = erd_reny.to_directed()
 out_edges = [edge for edge in erd_reny.edges if edge[1]
     < edge[0]]  # removing all outward edges
@@ -1998,7 +1858,6 @@ erd_reny.remove_edges_from(out_edges)
 pos_ER = nx.spring_layout(erd_reny, seed = 1050)
 nx.draw_networkx(erd_reny, with_labels = True, node_size = 500, pos = pos_ER)
 #%%
-
 adj_ER, ids_edge_ER = build_adjoint_graph(erd_reny)
 pos_adj = nx.spring_layout(adj_ER, seed = 1050)
 #%% PLOT OF ORIGINAL VS ADJOINT
@@ -2082,7 +1941,7 @@ ER_theo_adj, sol_ER_adj = solve_adjoint_ctrw_flow(erd_reny.copy(), adj_ER.copy()
 total_fl_theo = {edge:ER_theo_adj[edge[0]][edge[1]]['edge_visits'] for edge in 
                 ER_theo_adj.edges}
 
-grad_adj, sol_adj, har_adj, pot_adj, div_adj = hodge_decomposition(ER_theo_adj,
+grad_adj, sol_adj, har_adj, pot_adj, div_adj = hd.hodge_decomposition(ER_theo_adj,
                                                                    'edge_visits')
 plot_hodge(ER_theo_adj, grad_adj, sol_adj, har_adj, pot_adj, div_adj, pos_ER)
 
@@ -2096,7 +1955,7 @@ total_fl_sim = {edge:walked_ER_edge[edge[0]][edge[1]]['edge_visits'] for edge in
                 walked_ER_edge.edges}
 
 grad_sim_adj, sol_sim_adj, har_sim_adj, pot_sim_adj, div_sim_adj = \
-    hodge_decomposition(walked_ER_edge,'edge_visits')
+    hd.hodge_decomposition(walked_ER_edge,'edge_visits')
 
 plot_hodge(walked_ER_edge, grad_sim_adj, sol_sim_adj, har_sim_adj, pot_sim_adj, 
            div_sim_adj, pos_ER)
@@ -2187,15 +2046,15 @@ n_walk = 120
 v = 1
 walked_v_ER = node_walkers(erd_reny.copy(), Dt, v, pos_ER, n_walk)
 grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, div_cnst_v = \
-    hodge_decomposition(walked_v_ER,'edge_visits')
+    hd.hodge_decomposition(walked_v_ER,'edge_visits')
 
-#%% correlations between dynamics: PBC LATTICE
+#%% correlations between dynamics
 #edge centric
-plot_pot_corr(pot_adj, pot_cnst_v, 'Potential Adjoint Model', 
+plot_pot_corr(pot_adj, pot_cnst_v, 'Potential edge-centric Model', 
               'Potential constant velocity')
-plot_grad_corr(grad_adj, grad_cnst_v, 'Grad. comp. Adjoint Model', 
+plot_grad_corr(grad_adj, grad_cnst_v, 'Grad. comp. edge-centric Model', 
               'Grad. comp. constant velocity')
-
+#%%
 #node centric
 plot_pot_corr(pot_cont_new, pot_cnst_v,'Potential Node Centric', 
               'Potential constant velocity')
@@ -2340,7 +2199,7 @@ PBC_th, solution_PBC, curl_theo = solve_continuous_rw_flow(PBC_lattice.copy(), t
 rev_PBC_th = reverse_negative_edges(PBC_th)
 
 grad_PBC_nc_th, sol_PBC_nc_th, har_PBC_nc_th, pot_PBC_nc_th, div_PBC_nc_th = \
-    hodge_decomposition(rev_PBC_th, 'edge_visits')
+    hd.hodge_decomposition(rev_PBC_th, 'edge_visits')
 
 plot_hodge(rev_PBC_th, grad_PBC_nc_th, sol_PBC_nc_th, har_PBC_nc_th, pot_PBC_nc_th,
            div_PBC_nc_th, pos_PBC)
@@ -2348,7 +2207,7 @@ plot_hodge(rev_PBC_th, grad_PBC_nc_th, sol_PBC_nc_th, har_PBC_nc_th, pot_PBC_nc_
 #simulation
 walked_nc_PBC, paths_PBC_nc = node_centric(PBC_lattice.copy(), Dt, v, pos_PBC, n_walk)
 grad_PBC_nc, sol_PBC_nc, har_PBC_nc, pot_PBC_nc, div_PBC_nc = \
-    hodge_decomposition(walked_nc_PBC, 'edge_visits')
+    hd.hodge_decomposition(walked_nc_PBC, 'edge_visits')
 
 print('curl theo', curl_theo)
 #%% NODE CENTRIC RW ON PBC MOD LATTICE
@@ -2363,17 +2222,17 @@ har_comp_list = []
 for i in range(200):
     walked_nc_PBC, paths_PBC_nc = node_centric(PBC_lattice.copy(), Dt, v, pos_PBC, n_walk)
     grad_PBC_nc, sol_PBC_nc, har_PBC_nc, pot_PBC_nc, div_PBC_nc = \
-        hodge_decomposition(walked_nc_PBC, 'edge_visits')
+        hd.hodge_decomposition(walked_nc_PBC, 'edge_visits')
     grad_comp_list.append(grad_PBC_nc)
     sol_comp_list.append(sol_PBC_nc)
     har_comp_list.append(har_PBC_nc)
-#%%   HISTOGRAMS
+#%% HISTOGRAMS
 from scipy.stats import norm, poisson
 
 trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, new_edges_rel, 1, 1)
 PBC_th, solution_PBC, _ = solve_continuous_rw_flow(PBC_lattice.copy(), trans_rate_PBC_nc, Dt, n_walk)
 g_PBC_th, s_PBC_th, h_PBC_th, pot_PBC_th, div_PBC_th = \
-    hodge_decomposition(PBC_th, 'edge_visits')
+    hd.hodge_decomposition(PBC_th, 'edge_visits')
 
 def fit_function(k, lamb):
     # The parameter lamb will be used as the fit parameter
@@ -2490,7 +2349,7 @@ for short_1, short_2 in zip(short_1_lsp, short_2_lsp):
     trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, new_edges_rel, short_1, short_2)
     PBC_th, solution_PBC, _ = solve_continuous_rw_flow(PBC_lattice.copy(), trans_rate_PBC_nc, Dt, n_walk)
     g_PBC_th, s_PBC_th, h_PBC_th, pot_PBC_th, div_PBC_th = \
-        hodge_decomposition(PBC_th, 'edge_visits')
+        hd.hodge_decomposition(PBC_th, 'edge_visits')
     
     if short_1 == short_1_lsp[0]:
         PBC_ini = PBC_th
@@ -2693,7 +2552,7 @@ n_walk = 100
 discr_PBC, _  = digraph_walkers(PBC_lattice.copy(), steps, n_walk)
 
 grad_discr_sim, sol_discr_sim, har_discr_sim, pot_discr_sim, div_discr_sim = \
-    hodge_decomposition(discr_PBC, 'edge_visits')
+    hd.hodge_decomposition(discr_PBC, 'edge_visits')
 #%%
 #THEO DISCR
 steps = 100
@@ -2704,7 +2563,7 @@ discr_PBC_theo, _ = discrete_rw_edge_flow(PBC_lattice.copy(), trans_matrix_PBC,
 
 rev_discr_PBC_theo = reverse_negative_edges(discr_PBC_theo)
 grad_discr_th, sol_discr_th, har_discr_th, pot_discr_th, div_discr_th = \
-    hodge_decomposition(rev_discr_PBC_theo, 'edge_visits')
+    hd.hodge_decomposition(rev_discr_PBC_theo, 'edge_visits')
 #%% plot discr pbc
 
 plot_hodge(discr_PBC, grad_discr_sim, sol_discr_sim, har_discr_sim, 
@@ -2722,7 +2581,7 @@ constant_v_pbc, _ = periodic_walkers(PBC_lattice.copy(), Dt, v, pos_PBC, n_walk
 
 rev_constant_v_pbc = reverse_negative_edges(constant_v_pbc)
 g_PBC_cont, s_PBC_cont, h_PBC_cont, pot_PBC_cont, div_PBC_cont =\
-hodge_decomposition(rev_constant_v_pbc, 'edge_visits')
+hd.hodge_decomposition(rev_constant_v_pbc, 'edge_visits')
 #%%
 plot_hodge(rev_constant_v_pbc, g_PBC_cont, s_PBC_cont, h_PBC_cont, pot_PBC_cont, 
            div_PBC_cont, pos_PBC)
@@ -2761,7 +2620,7 @@ total_fl_theo = {edge:PBC_theo_adj[edge[0]][edge[1]]['edge_visits'] for edge in
 rev_PBC_theo_adj = reverse_negative_edges(PBC_theo_adj)
 
 grad_adj_PBC, sol_adj_PBC, har_adj_PBC, pot_adj_PBC, div_adj_PBC = \
-    hodge_decomposition(rev_PBC_theo_adj,'edge_visits')
+    hd.hodge_decomposition(rev_PBC_theo_adj,'edge_visits')
 plot_hodge(rev_PBC_theo_adj, grad_adj_PBC, sol_adj_PBC, har_adj_PBC, 
            pot_adj_PBC, div_adj_PBC, pos_PBC)
 #%%
@@ -2774,7 +2633,7 @@ total_fl_sim = {edge:walked_PBC_edge[edge[0]][edge[1]]['edge_visits'] for edge i
                 walked_PBC_edge.edges}
 
 grad_sim_adj_PBC, sol_sim_adj_PBC, har_sim_adj_PBC, pot_sim_adj_PBC, div_sim_adj_PBC = \
-    hodge_decomposition(walked_PBC_edge,'edge_visits')
+    hd.hodge_decomposition(walked_PBC_edge,'edge_visits')
 
 plot_hodge(walked_PBC_edge, grad_sim_adj_PBC, sol_sim_adj_PBC, har_sim_adj_PBC, 
            pot_sim_adj_PBC, div_sim_adj_PBC, pos_PBC)
@@ -2864,7 +2723,7 @@ Dt = 20
 n_walk = 120
 v = 5
 walked_test_nc, _ = node_centric(low_deg_high_clust.copy(), Dt, v, pos_dict, n_walk)
-grad_test_nc, sol_test_nc, har_test_nc, pot_test_nc, div_test_nc = hodge_decomposition(walked_test_nc, 'edge_visits')
+grad_test_nc, sol_test_nc, har_test_nc, pot_test_nc, div_test_nc = hd.hodge_decomposition(walked_test_nc, 'edge_visits')
 
 # THEORETICAL 
 
@@ -2875,7 +2734,7 @@ test_nc_th, _ = solve_continuous_rw_flow(low_deg_high_clust,
                                               trans_rate_test_nc, Dt, n_walk)
 
 g_cont_test_nc, s_cont_test_nc, h_cont_test_nc, pot_cont_test_nc, div_cont_test_nc \
-    = hodge_decomposition(test_nc_th, 'edge_visits')
+    = hd.hodge_decomposition(test_nc_th, 'edge_visits')
 
 #%% PLOT
 
@@ -2936,7 +2795,7 @@ n_walk = 120
 v = 1
 walked_test_nc, _ = node_centric(CM.copy(), Dt, v, pos_nodes, n_walk)
 grad_test_nc, sol_test_nc, har_test_nc, pot_test_nc, div_test_nc = \
-    hodge_decomposition(walked_test_nc, 'edge_visits')
+    hd.hodge_decomposition(walked_test_nc, 'edge_visits')
     
 #%% CONSTANT SPEED
 Dt = 20
@@ -2944,7 +2803,7 @@ n_walk = 120
 v = 1
 walked_v_CM = node_walkers(CM.copy(), Dt, v, pos_nodes, n_walk)
 grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, div_cnst_v = \
-    hodge_decomposition(walked_v_CM,'edge_visits')
+    hd.hodge_decomposition(walked_v_CM,'edge_visits')
     
 #%%
 # THEORETICAL 
@@ -2957,7 +2816,7 @@ trans_rate_test_nc = build_trans_rates_matrix(CM.copy(),
 test_nc_th, _ = solve_continuous_rw_flow(CM.copy(), trans_rate_test_nc, Dt, n_walk)
 
 g_cont_test_nc, s_cont_test_nc, h_cont_test_nc, pot_cont_test_nc, div_cont_test_nc \
-    = hodge_decomposition(test_nc_th, 'edge_visits')
+    = hd.hodge_decomposition(test_nc_th, 'edge_visits')
 
 #%% PLOT
 

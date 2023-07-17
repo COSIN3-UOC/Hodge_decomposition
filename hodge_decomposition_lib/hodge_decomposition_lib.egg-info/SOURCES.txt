@@ -1,0 +1,9 @@
+README.md
+setup.py
+hodge_dec/__init__.py
+hodge_dec/hodge_decomposition.py
+hodge_decomposition_lib.egg-info/PKG-INFO
+hodge_decomposition_lib.egg-info/SOURCES.txt
+hodge_decomposition_lib.egg-info/dependency_links.txt
+hodge_decomposition_lib.egg-info/requires.txt
+hodge_decomposition_lib.egg-info/top_level.txt
