@@ -9,10 +9,10 @@ This library takes a weighted DiGraph with the flows at each edge and performs t
 
 ## Installation
 
-You can install the library using pip:
+You can install the library downloading the repository and using pip:
 
 ```bash
-python -m pip install 'COSIN3-UOC @ git+https://github.com/COSIN3-UOC/Hodge_decomposition/tree/main/hodge_decomposition_lib'
+python -m pip install pip install /path/to/hodge_decomposition_lib-0.1.0-py3-none-any.whl
 ```
 
 ## Issues
