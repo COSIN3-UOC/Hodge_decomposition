@@ -52,6 +52,24 @@ def find_triangles(G:nx.classes.DiGraph):
 
 
 def hodge_decomposition(G, attr_name):
+    '''
+    Performs the Hodge decomposition on a directed and weighted graph
+
+    Parameters
+    ----------
+    G : nx.DiGraph
+        Networkx directed graph.
+    attr_name : str
+        Name of the edge attribute that represent the flow to be decomposed.
+
+    Returns
+    -------
+    grad_comp: dict {edge: gradient comp}
+    sol_comp: dict {edge: solenoidal comp}
+    har_comp: dict {edge: harmonic comp}
+    pot_nodes: dict {node: potential}
+    div: dict {node: divergence}
+    '''
 
 # vector of the edge attribute considered where each component is the value of the
 # attr of a given edge
@@ -264,7 +282,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     #                                              'dt', normalized =False)
     # deg = walk_graph.degree()
     # deg_dict = {node[0]: node[1] for node in deg}
-    plt.subplots(2, 2, figsize=(9, 6))
+    plt.subplots(2, 2, figsize=(12, 9))
     plt.subplot(221)
     plt.title('Original Graph 100%')
 
@@ -295,7 +313,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
                                 norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
-    cbar.set_label(r'\omega$', fontsize = 18)
+    cbar.set_label(r'$\omega$', fontsize = 18)
 
     # sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin=vmin_div,
     #                                                               vmax=vmax_div))
