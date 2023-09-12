@@ -833,13 +833,11 @@ def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     
     bcn_edges = gpd.read_file(path_bcn, crs="EPSG:25831")
 
-    # bcn_nodes = gpd.read_file('/Users/robertbenassai/Documents/UOC/alertadadesconfidencialsdatosconfidencialesconfid/vertices.shp',
-    #                           crs="EPSG:25831")
-    bcn_nodes = gpd.read_file('/Users/robertbenassai/Documents/UOC/xarxaneta/nodes_clean_net_willum.shp',
+
+    bcn_nodes = gpd.read_file('/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/nodes_clean_net_willum.shp',
                           crs="EPSG:25831")
-    # missing_edges = pd.read_csv(
-    #     '/Users/robertbenassai/Documents/UOC/alertadadesconfidencialsdatosconfidencialesconfid/missing_edges.csv')
-    bcn_distr = gpd.read_file('/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp',
+
+    bcn_distr = gpd.read_file(path_distr,
                               crs="EPSG:25831")
     nodes_w_distr = gpd.sjoin(bcn_nodes, bcn_distr,
                             how="left", predicate='within')
@@ -850,21 +848,12 @@ def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     ind_to_pos = {nodes_w_distr.loc[i,'uid']:(nodes_w_distr.loc[i,'geometry'].x,
                                           nodes_w_distr.loc[i,'geometry'].y) for i in 
                   range(len(nodes_w_distr))}
-    # pos_to_index = {(nodes_w_distr.loc[i,'geometry'].x, 
-    #                  nodes_w_distr.loc[i,'geometry'].y):nodes_w_distr.loc[i,'uid']
-    #                 for i in range(len(nodes_w_distr))}
-    #nx.set_node_attributes(bcn_graph, ind_to_pos, 'pos')
+
 
     for i, j in zip(bcn_edges['i'], bcn_edges['j']):
-        # sep = edge.split(',')
-        # if len(sep) == 2:
-            # if int(sep[0]) and int(sep[1]) in distr.nodes:
-            if i and j in distr.nodes:
-                distr.add_edge(int(i), int(j))
+        if i and j in distr.nodes:
+            distr.add_edge(int(i), int(j))
                 
-    # for i,j in zip(missing_edges['FROM_NODE'], missing_edges['TO_NODE']):
-    #     if (i and j) in distr.nodes:
-    #         distr.add_edge(i, j)
     
     #checking for self loops
     self_loops = []
@@ -892,6 +881,13 @@ def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     f, ax = plt.subplots(figsize=(12, 6))
     nx.draw(distr, pos = ind_to_pos,node_size = 2, ax = ax)
     nx.set_node_attributes(distr, ind_to_pos, name = 'pos')
+    
+    #relabeling nodes to ascending order
+    dict_relabel = {node: i for i, node in enumerate(distr.nodes)}
+    nx.relabel_nodes(distr, dict_relabel, copy = False)
+    
+    ind_to_pos_upd = {dict_relabel[node]: ind_to_pos[node] for node in 
+                      dict_relabel.keys()}
     return(distr, ind_to_pos)
 
 #%%Structural_ratios
@@ -1152,8 +1148,8 @@ def solve_continuous_rw_flow(G:nx.DiGraph, trans_rates:np.array, Dt:float, n_wal
 # %% EIXAMPLE (02)
 '''L'EIXAMPLE'''
 distr_ind = 2
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 eixample, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 # %%
@@ -1209,8 +1205,8 @@ with open('eixample_dec.txt', 'r', newline='\n') as eix_file:
 '''CIUTAT VELLA'''
 
 distr_ind = 1
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 cv, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1336,8 +1332,8 @@ plt.legend()
 #%% SANTS MONTJUÏC
 '''SANTS - MONTJUÏC'''
 distr_ind = 3
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 sts_mj, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1401,8 +1397,8 @@ pot_vs_cent = [[pot_sts_mj[node],betweenness_cent[node]] for node in pot_sts_mj.
 #%% LES CORTS
 '''LES CORTS'''
 distr_ind = 4
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 corts, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1463,8 +1459,8 @@ plt.ylabel(r'$\left|\omega\right|$')
 #%% SARRIÀ - ST. GERVASI
 '''SARRIÀ - SANT GERVASI'''
 distr_ind = 5
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 sarr, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1515,8 +1511,8 @@ file.close()
 #%% GRÀCIA
 '''GRÀCIA'''
 distr_ind = 6
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 gracia, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1561,8 +1557,8 @@ file.close()
 #%% HORTA-GUINARDÓ
 '''HORTA-GUINARDÓ'''
 distr_ind = 7
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 horta, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1606,8 +1602,8 @@ file.close()
 #%% NOU BARRIS
 '''NOU BARRIS'''
 distr_ind = 8
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 noub, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1654,8 +1650,8 @@ file.close()
 #%% ST. ANDREU
 '''SANT ANDREU'''
 distr_ind = 9
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 st_and, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
@@ -1701,8 +1697,8 @@ file.close()
 
 '''SANT MARTÍ'''
 distr_ind = 10
-path_bcn = '/Users/robertbenassai/Documents/UOC/xarxaneta/edges_clean_net_willum.shp'
-path_distr = '/Users/robertbenassai/Documents/UOC/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
 
 st_mart, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 

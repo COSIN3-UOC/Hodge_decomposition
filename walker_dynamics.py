@@ -1623,13 +1623,13 @@ n_walk = 200
 v = 1
 times = np.linspace(0.1, 101.1, 100)
 # times = np.array(range(101))
-with open('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_grad_evolution_w2.csv', 
+with open('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_grad_evolution_w2.csv', 
           'w') as file1:
     writer = csv.writer(file1)
-    with open('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_sol_evolution_w2.csv', 
+    with open('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_sol_evolution_w2.csv', 
               'w') as file2:
         writer2 = csv.writer(file2)
-        with open('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_har_evolution_w2.csv', 
+        with open('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_har_evolution_w2.csv', 
                   'w') as file3:
             writer3 = csv.writer(file3)
             for Dt in times:
@@ -1696,39 +1696,49 @@ with open('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_grad_ev
                 writer.writerow([Dt] + list(grad_list))
                 writer2.writerow([Dt] + list(sol_list))
                 writer3.writerow([Dt] + list(har_list))
-#%%
-key_dict = {key: i+1 for i, key in enumerate(sorted(erd_reny.edges))}
-print(erd_reny.edges)
 #%%READING AND PLOTTING
+
+key_dict = {key: i+1 for i, key in enumerate(sorted(erd_reny.edges))}
+print(key_dict)
 #simulation
 
-grad_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_grad_evolution_w2.csv', 
+#RG
+grad_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_grad_evolution_w2.csv', 
                         sep = ',', header=None)
-sol_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_sol_evolution_w2.csv', 
+sol_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_sol_evolution_w2.csv', 
                         sep = ',', header=None)
-har_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_har_evolution_w2.csv', 
+har_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_har_evolution_w2.csv', 
                       sep = ',', header=None)
+
+# ER
+
+# grad_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/ER/ER_50_01_grad_evolution.csv', 
+#                         sep = ',', header=None)
+# sol_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/ER/ER_50_01_sol_evolution.csv', 
+#                         sep = ',', header=None)
+# har_evo = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/ER/ER_50_01_har_evolution.csv', 
+#                       sep = ',', header=None)
 
 #theortical
 
-grad_evo_th = pd.read_csv('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_grad_evolution_th_w2.csv', 
+grad_evo_th = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_grad_evolution_th_w2.csv', 
                         sep = ',', header=None)
-sol_evo_th = pd.read_csv('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_sol_evolution_th_w2.csv', 
+sol_evo_th = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_sol_evolution_th_w2.csv', 
                         sep = ',', header=None)
-har_evo_th = pd.read_csv('/Users/robertbenassai/Documents/UOC/Evolution_MSF/RG/RG_50_02_sol_evolution_th_w2.csv', 
+har_evo_th = pd.read_csv('/Users/robertbenassai/Documents/UOC/project_HHD/Evolution_MSF/RG/RG_50_02_sol_evolution_th_w2.csv', 
                       sep = ',', header=None)
 
 
-plt.figure()
-plt.xlabel('total simulaiton time')
-plt.ylabel(r'$\omega^2$')
-times = np.linspace(0.1, 101.1, 100)
+# plt.figure()
+# plt.xlabel('total simulaiton time')
+# plt.ylabel(r'$\omega^2$')
+times = np.linspace(0.1, 201.1, 100)
 
 diff_ls = []
 err_ls = []
 
 # for track_edge in erd_reny.edges:
-track_edge = (25,30)
+track_edge = (11,17)
 total_comp = har_evo.iloc[:, key_dict[track_edge]]+sol_evo.iloc[:, key_dict[track_edge]]\
                                             +grad_evo.iloc[:, key_dict[track_edge]]
    
@@ -1741,21 +1751,21 @@ slope /= len(erd_reny.nodes)
 params, pcov = curve_fit(func, times, total_comp/(len(erd_reny.nodes)))
 perr_weights = np.sqrt(np.diag(pcov))
 
-# diff_ls.append([slope, params[1]])    
-# err_ls.append(perr_weights[1])
+diff_ls.append([round(slope, 5), params[0]])    
+err_ls.append(perr_weights[0])
                                     
 plt.plot(times, har_evo.iloc[:, key_dict[track_edge]]/(len(erd_reny.nodes)), 'b', label = 'Harmonic')
 plt.plot(times, grad_evo.iloc[:, key_dict[track_edge]]/(len(erd_reny.nodes)), 'g', label = 'Gradient')
 plt.plot(times, sol_evo.iloc[:, key_dict[track_edge]]/(len(erd_reny.nodes)), 'r', label = 'Solenoidal')
 plt.plot(times, total_comp/(len(erd_reny.nodes)), 'orange', label = 'Total')
 
-times = np.linspace(0.1, 101.1, 300)
-plt.plot(times,har_evo_th.iloc[:, key_dict[track_edge]], 'b--', label = 'Harmonic')
-plt.plot(times,grad_evo_th.iloc[:, key_dict[track_edge]], 'g--', label = 'Gradient')
-plt.plot(times,sol_evo_th.iloc[:, key_dict[track_edge]], 'r--', label = 'Solenoidal')
+# times = np.linspace(0.1, 101.1, 300)
+# plt.plot(times,har_evo_th.iloc[:, key_dict[track_edge]], 'b--', label = 'Harmonic')
+# plt.plot(times,grad_evo_th.iloc[:, key_dict[track_edge]], 'g--', label = 'Gradient')
+# plt.plot(times,sol_evo_th.iloc[:, key_dict[track_edge]], 'r--', label = 'Solenoidal')
 
 plt.plot(times, slope*times, color = 'gray', label = 'prediction: '
-         +str(round(slope,2))+'t', ls = '-.')
+          +str(round(slope,2))+'t', ls = '-.')
 
 # plt.plot(times, params[1]*times**params[0], '--', color = 'black', label = r'$y = ('\
 #           +str(round(params[1], 2))+'\pm'+str(round(perr_weights[1], 2))+') t_1^{'+\
@@ -1769,8 +1779,8 @@ plt.legend()
 plt.figure()
 plt.xlabel('birth/death')
 plt.ylabel('fit')
-plt.scatter(*zip(*diff_ls))
-plt.errorbar(*zip(*diff_ls), yerr = err_ls)
+plt.errorbar(*zip(*diff_ls), yerr = err_ls, ls = "None")
+plt.scatter(*zip(*diff_ls), s = 10)
 
 solution_ER[-1]
 #%% ADJOINT MATRIX
