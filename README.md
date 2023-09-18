@@ -32,13 +32,12 @@ Latest versions of the following python libraries:
 - sns
 - csv
 - collections
-- 
 
 ## License
 
 Creative commons
 
-## Contact (optional)
+## Contact
 
 rbenassai@uoc.edu
 
