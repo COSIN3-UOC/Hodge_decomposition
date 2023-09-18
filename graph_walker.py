@@ -921,7 +921,7 @@ nx.draw_networkx_edge_labels(wheel_d, pos=pos_c, edge_labels=har_wh,
 plt.tight_layout()
 plt.show()
 
-# %%
+
 # %%IMPORTANCE OF EACH COMPONENT
 
 w = np.array(list(edge_wh.values()))

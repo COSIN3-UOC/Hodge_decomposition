@@ -25,6 +25,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import random
 import numpy as np
+import hodge_dec.hodge_decomposition as hd
 
 # %% WALKERS ON A DIRECTED GRAPH (walk during amount of steps)
 from collections import Counter
@@ -689,9 +690,32 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     
     g_field = np.array([walk_graph[edge[0]][edge[1]]['edge_visits'] for edge
                                      in walk_graph.edges])
+    
+    #mean neigh dists for each node
+    
+    dists = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))
+            for edge in walk_graph.edges}
+    
+    nx.set_edge_attributes(walk_graph, dists, 'length')
+    
+    mean_dists = {}
+    for node in walk_graph.nodes:
+        adj_edg = list(walk_graph.in_edges(node)) + \
+        list(walk_graph.out_edges(node))
+        
+        avg_dst = 0
+        for e in adj_edg:
+            avg_dst += walk_graph[e[0]][e[1]]['length']
+        
+        avg_dst /= len(adj_edg)
+        mean_dists[node] = avg_dst
+    
+        
+    
+    
     percentile = np.percentile(g_field, 95)
     percentile_pot = np.percentile(list(pot.values()), 95)
-    
+    percentile_dist = np.percentile(list(mean_dists.values()), 95)
 
     w = np.array(list(edge_graph.values()))
     wg = np.array(list(grad_comp.values()))
@@ -702,51 +726,61 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     weight_h = np.sum(np.square(wh))/np.sum(np.square(w))
 
     print(weight_g, weight_s, weight_h, weight_g+weight_s+weight_h)
+    
     # und_walk = walk_graph.to_undirected()
     # betweenness_cent = nx.betweenness_centrality(und_walk, weight = 
     #                                              'dt', normalized =False)
+    
+    
     deg = walk_graph.degree()
     deg_dict = {node[0]: node[1] for node in deg}
-    plt.subplots(2, 2, figsize=(15, 15))
-    plt.subplot(221)
-    plt.title('Original Graph 100%')
+    plt.subplots(1, 2, figsize=(16, 5))
+    plt.subplot(121)
+    plt.title('Original Graph 100%', fontsize = 20)
 
     # color_p = np.abs(np.array(list(edge_graph.values())))
     color_p = np.array(list(edge_graph.values()))
     # colors = np.linspace(0, percentile)
-    # cmap = plt.cm.Oranges
-    colors = np.linspace(-percentile, percentile)
-    cmap = plt.cm.seismic
+    colors = np.linspace(0, percentile)
+    cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
 
-    # color_div = list(div.values())
-    # colors_div = range(int(min(color_div)), int(max(color_div)))
-    # cmap_div = plt.cm.RdBu_r
+    color_div = list(mean_dists.values())
+    colors_div = range(int(min(color_div)), int(max(color_div)))
+    cmap_div = plt.cm.PRGn
     # vmin_div = min(colors_div)
     # vmax_div = round(max(color_div))
+    vmax_div = percentile_dist
+    vmin_div = min(color_div)
 
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4, 
-                           node_color='#D3D3D3')
-                            # node_color=color_div, cmap=cmap_div, vmin=vmin_div,
-                            # vmax=vmax_div)
+
+    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=6, 
+                           # node_color='#D3D3D3')
+                            node_color=color_div, cmap=cmap_div, vmin=vmin_div,
+                            vmax=vmax_div)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_p,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 4)
+                           arrowsize = 5, node_size = 6)
 
     sm = plt.cm.ScalarMappable(cmap=cmap, 
                                norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega\right|$')
+    cbar.set_label(r'$\omega_{tot}$', fontsize = 18)
+    cbar.ax.tick_params(labelsize=18)
 
-    # sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin=vmin_div,
-    #                                                               vmax=vmax_div))
-    # sm2._A = []
-    # cbar2 = plt.colorbar(sm2, location='right')
-    # cbar2.set_label(r'Node div')
 
-    plt.subplot(222)
+    sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin=vmin_div,
+                                                                  vmax=vmax_div))
+    sm2._A = []
+    cbar2 = plt.colorbar(sm2, location='right')
+    cbar2.set_label(r'Avg. surrounding edge lengths', fontsize = 18)
+    cbar2.ax.tick_params(labelsize=18)
+    plt.subplot(122)
+    
+    #GRADIENT COMPONENT
+    
     color_g = np.abs(np.array(list(grad_comp.values())))
     # plotting edges with color gradient
 
@@ -755,72 +789,77 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # vmax_pot = max([int(np.max(color_pot)), int(np.abs(np.min(color_pot)))])
     vmax_pot = percentile_pot
     vmin_pot = -vmax_pot
-
+    # vmax_pot = np.max(color_pot)
+    # vmin_pot = np.min(color_pot)
 
     colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
-    plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%')
+    plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%', fontsize = 20)
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None,
-                            node_size=8, node_color=color_pot, cmap=cmap_pot,
+                            node_size=6, node_color=color_pot, cmap=cmap_pot,
                             vmin=vmin_pot, vmax=vmax_pot)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_g,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax, 
-                           arrowsize = 5, node_size = 8)
+                           arrowsize = 5, node_size = 6)
 
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega_g\right|$')
-
+    cbar.set_label(r'$\left|\omega_g\right|$', fontsize = 18)
+    cbar.ax.tick_params(labelsize=18)
+    
     sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin=vmin_pot,
                                                                   vmax=vmax_pot))
     sm2._A = []
     cbar2 = plt.colorbar(sm2, location='right')
-    cbar2.set_label(r'Node potentials')
-
+    cbar2.set_label(r'Node potentials', fontsize = 18)
+    cbar2.ax.tick_params(labelsize = 18)
+    
     colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
 
     color_s = np.abs(np.array(list(sol_comp.values())))
-    plt.subplot(223)
-    plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
-                           node_color='#D3D3D3')
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_s,
-                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 4)
+    # plt.subplot(223)
+    # plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%', fontsize = 20)
+    # nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
+    #                        node_color='#D3D3D3')
+    # nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_s,
+    #                        edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
+    #                        arrowsize = 5, node_size = 4)
 
 
-    sm = plt.cm.ScalarMappable(
-        cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm._A = []
-    cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega_s\right|$')
+    # sm = plt.cm.ScalarMappable(
+    #     cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+    # sm._A = []
+    # cbar = plt.colorbar(sm)
+    # cbar.set_label(r'$\left|\omega_s\right|$', fontsize = 18)
+    # cbar.ax.tick_params(labelsize=18)
+    
+    
+    # colors = np.linspace(0, percentile)
+    # cmap = plt.cm.Oranges
+    # vmin = min(colors)
+    # vmax = max(colors)
 
-    colors = np.linspace(0, percentile)
-    cmap = plt.cm.Oranges
-    vmin = min(colors)
-    vmax = max(colors)
-
-    color_h = np.array(list(har_comp.values()))
-    plt.subplot(224)
-    plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%')
-    nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
-                           node_color='#D3D3D3')
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_h,
-                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                           arrowsize = 5, node_size = 4)
-    sm = plt.cm.ScalarMappable(
-        cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm._A = []
-    cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\left|\omega_h\right|$')
-
+    # color_h = np.array(list(har_comp.values()))
+    # plt.subplot(224)
+    # plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%', fontsize = 20)
+    # nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
+    #                        node_color='#D3D3D3')
+    # nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_h,
+    #                        edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
+    #                        arrowsize = 5, node_size = 4)
+    # sm = plt.cm.ScalarMappable(
+    #     cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+    # sm._A = []
+    # cbar = plt.colorbar(sm)
+    # cbar.set_label(r'$\left|\omega_h\right|$', fontsize = 18)
+    # cbar.ax.tick_params(labelsize=18)
     plt.tight_layout()
     # plt.savefig('/Users/robertbenassai/Documents/UOC/figs/lattice_evolution/lattice_dt'+str(Dt)+'.png')
     plt.show()
@@ -831,28 +870,52 @@ import time
 import momepy
 def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     
+    # edges and nodes of the whole graph
     bcn_edges = gpd.read_file(path_bcn, crs="EPSG:25831")
 
 
     bcn_nodes = gpd.read_file('/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/nodes_clean_net_willum.shp',
                           crs="EPSG:25831")
-
-    bcn_distr = gpd.read_file(path_distr,
-                              crs="EPSG:25831")
-    nodes_w_distr = gpd.sjoin(bcn_nodes, bcn_distr,
-                            how="left", predicate='within')
-    distr_df = nodes_w_distr.loc[nodes_w_distr['DISTRICTE'] == 
-                                 "{:02d}".format(distr_ind)]
-    distr = nx.DiGraph()
-    distr.add_nodes_from(distr_df['uid'])
-    ind_to_pos = {nodes_w_distr.loc[i,'uid']:(nodes_w_distr.loc[i,'geometry'].x,
-                                          nodes_w_distr.loc[i,'geometry'].y) for i in 
-                  range(len(nodes_w_distr))}
-
-
-    for i, j in zip(bcn_edges['i'], bcn_edges['j']):
-        if i and j in distr.nodes:
+    
+    if distr_ind == 0: # graph of the entire city
+    
+        # initialize graph of the district
+        distr = nx.DiGraph()
+        distr.add_nodes_from(bcn_nodes['uid'])
+        ind_to_pos = {bcn_nodes.loc[i,'uid']:(bcn_nodes.loc[i,'geometry'].x,
+                                              bcn_nodes.loc[i,'geometry'].y) 
+                      for i in range(len(bcn_nodes))}
+    
+    
+        for i, j in zip(bcn_edges['i'], bcn_edges['j']):
+            
             distr.add_edge(int(i), int(j))
+        
+    else: # get the graph of a given district
+
+        # districts
+        bcn_distr = gpd.read_file(path_distr,
+                                  crs="EPSG:25831")
+        
+        # joined dataframes (districts and nodes)
+        nodes_w_distr = gpd.sjoin(bcn_nodes, bcn_distr,
+                                how="left", predicate='within')
+        
+        # select only the nodes of the given district
+        distr_df = nodes_w_distr.loc[nodes_w_distr['DISTRICTE'] == 
+                                     "{:02d}".format(distr_ind)]
+        
+        # initialize graph of the district
+        distr = nx.DiGraph()
+        distr.add_nodes_from(distr_df['uid'])
+        ind_to_pos = {nodes_w_distr.loc[i,'uid']:(nodes_w_distr.loc[i,'geometry'].x,
+                                              nodes_w_distr.loc[i,'geometry'].y) for i in 
+                      range(len(nodes_w_distr))}
+    
+    
+        for i, j in zip(bcn_edges['i'], bcn_edges['j']):
+            if i and j in distr.nodes:
+                distr.add_edge(int(i), int(j))
                 
     
     #checking for self loops
@@ -866,6 +929,9 @@ def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     print('checking for disconnected components...')
     remove_nodes = list(nx.connected_components(distr.to_undirected()))
     print('total number of connected components', len(remove_nodes))
+    
+    #plot of components
+    
     plt.figure()
     for component in remove_nodes:
         subg = distr.subgraph(component)
@@ -884,11 +950,10 @@ def distr_to_nx(distr_ind:int, path_bcn: str, path_distr: str):
     
     #relabeling nodes to ascending order
     dict_relabel = {node: i for i, node in enumerate(distr.nodes)}
-    nx.relabel_nodes(distr, dict_relabel, copy = False)
-    
+    distr = nx.relabel_nodes(distr, dict_relabel, copy = True)    
     ind_to_pos_upd = {dict_relabel[node]: ind_to_pos[node] for node in 
                       dict_relabel.keys()}
-    return(distr, ind_to_pos)
+    return(distr, ind_to_pos_upd)
 
 #%%Structural_ratios
 #calculates the ratio between the dimension of each hodge component and the dim
@@ -1024,7 +1089,7 @@ def build_trans_rates_matrix(G, pos, v):
     #distances of the edges in the graph
     dists = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
             for edge in G_und.edges}
-
+    
     # ONLY FOR PBC_LATTICE ----------------------------------------------------
     # lattice_gap = 1
     # for i in range(N):
@@ -1126,7 +1191,7 @@ def solve_continuous_rw_flow(G:nx.DiGraph, trans_rates:np.array, Dt:float, n_wal
     # p0 = np.ones(len(G.nodes))
     p0 = np.ones(len(G.nodes))
     
-    t = np.linspace(start=0, stop=Dt,num=20000)
+    t = np.linspace(start=0, stop=Dt,num=10000)
     sol = odeint(func=dp_dt, y0=p0, t=t, args = (trans_rates, None))
     
     #INTEGRATION
@@ -1170,11 +1235,18 @@ start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_eix = node_walkers(eixample, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_eix = build_trans_rates_matrix(eixample, ind_to_pos, v)
+walk_eix, _ = solve_continuous_rw_flow(eixample.copy(), trans_rates_eix, Dt, n_walk)
+
+#%% simulation
+# walk_eix = node_walkers(eixample, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_eix = hd.reverse_negative_edges(walk_eix)
 grad_eix, sol_eix, har_eix, pot_eix, div_eix = hodge_decomposition(
-    walk_eix, 'edge_visits')
+    rev_eix, 'edge_visits')
 # %%
 with open('eixample_dec_dt_15_connected.txt', 'w') as eix_file:
     eix_file.write(str(grad_eix)+'\n')
@@ -1184,7 +1256,7 @@ with open('eixample_dec_dt_15_connected.txt', 'w') as eix_file:
     eix_file.write(str(div_eix)+'\n')
 eix_file.close()
 # %%
-plot_hodge(walk_eix, grad_eix, sol_eix, har_eix, pot_eix, div_eix, ind_to_pos)
+plot_hodge(rev_eix, grad_eix, sol_eix, har_eix, pot_eix, div_eix, ind_to_pos)
 
 # %%
 plt.figure()
@@ -1243,8 +1315,9 @@ walk_cv, _ = solve_continuous_rw_flow(cv.copy(), trans_rates_cv, Dt, n_walk)
 # walk_cv = node_walkers(cv, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 #%%
-grad_cv, sol_cv, har_cv, pot_cv, div_cv = hodge_decomposition(
-    walk_cv, 'edge_visits')
+rev_cv = hd.reverse_negative_edges(walk_cv)
+grad_cv, sol_cv, har_cv, pot_cv, div_cv = hd.hodge_decomposition(
+    rev_cv, 'edge_visits')
 # %%
 with open('cv_dec_dt_13_connected.txt', 'w') as file:
     file.write(str(grad_cv)+'\n')
@@ -1282,7 +1355,8 @@ plt.ylabel('Frequency')
 plt.hist(pot_field, bins = 50, edgecolor ='black')
 
 #%%
-plot_hodge(walk_cv, grad_cv, sol_cv, har_cv, pot_cv, div_cv, ind_to_pos)
+
+plot_hodge(rev_cv, grad_cv, sol_cv, har_cv, pot_cv, div_cv, ind_to_pos)
 
 #%%
 dict_ls = []
@@ -1312,8 +1386,9 @@ n_walk = 20
 walk_cv = digraph_walkers(cv, steps, n_walk) #10, 20, 30, 40, 60, 70, 80
 print("--- %s seconds ---" % (time.time() - start_time))
 #%%
+rev_cv = hd.reverse_negative_edges(walk_cv)
 grad_cv, sol_cv, har_cv, pot_cv, div_cv = hodge_decomposition(
-    walk_cv, 'edge_visits')
+    rev_cv, 'edge_visits')
 #%%
 plot_hodge(walk_cv, grad_cv, sol_cv, har_cv, pot_cv, div_cv, ind_to_pos)
 #%%
@@ -1353,21 +1428,24 @@ plt.hist(dists, bins = 100,range=(0,100), density = True)
 plt.legend()
 print(min(dists))
 #%%
-mean_dist = np.mean(dists)
-print(mean_dist)
 start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_sts_mj = node_walkers(sts_mj, Dt, v, ind_to_pos, n_walk)
+#THEO
+trans_rates_sts = build_trans_rates_matrix(sts_mj, ind_to_pos, v)
+walk_sts_mj, _ = solve_continuous_rw_flow(sts_mj.copy(), trans_rates_sts, Dt, n_walk)
+
+# walk_sts_mj = node_walkers(sts_mj, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 #%%
 st_ratio_g, st_ratio_s, st_ratio_h = structural_ratios(sts_mj)
 
 print(st_ratio_g, st_ratio_s, st_ratio_h)
 # %%
+rev_sts_mj = hd.reverse_negative_edges(walk_sts_mj)
 grad_sts_mj, sol_sts_mj, har_sts_mj, pot_sts_mj, div_sts_mj = hodge_decomposition(
-    walk_sts_mj, 'edge_visits')
+    rev_sts_mj, 'edge_visits')
 # %%
 with open('sts_mj_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_sts_mj)+'\n')
@@ -1377,7 +1455,7 @@ with open('sts_mj_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_sts_mj)+'\n')
 file.close()
 # %%
-plot_hodge(walk_sts_mj, grad_sts_mj, sol_sts_mj, har_sts_mj, pot_sts_mj, div_sts_mj, ind_to_pos)
+plot_hodge(rev_sts_mj, grad_sts_mj, sol_sts_mj, har_sts_mj, pot_sts_mj, div_sts_mj, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1416,17 +1494,20 @@ st_ratio_g, st_ratio_s, st_ratio_h = structural_ratios(corts)
 
 print(st_ratio_g, st_ratio_s, st_ratio_h)
 #%%
-mean_dist = np.mean(dists)
-print(mean_dist)
 start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_corts = node_walkers(corts, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_corts = build_trans_rates_matrix(corts, ind_to_pos, v)
+walk_corts, _ = solve_continuous_rw_flow(corts.copy(), trans_rates_corts, Dt, n_walk)
+# walk_corts = node_walkers(corts, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_corts = hd.reverse_negative_edges(walk_corts)
 grad_corts, sol_corts, har_corts, pot_corts, div_corts = hodge_decomposition(
-    walk_corts, 'edge_visits')
+    rev_corts, 'edge_visits')
 # %%
 with open('corts_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_corts)+'\n')
@@ -1436,7 +1517,7 @@ with open('corts_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_corts)+'\n')
 file.close()
 # %%
-plot_hodge(walk_corts, grad_corts, sol_corts, har_corts, pot_corts, div_corts, ind_to_pos)
+plot_hodge(rev_corts, grad_corts, sol_corts, har_corts, pot_corts, div_corts, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1478,17 +1559,21 @@ st_ratio_g, st_ratio_s, st_ratio_h = structural_ratios(sarr)
 
 print(st_ratio_g, st_ratio_s, st_ratio_h)
 #%%
-mean_dist = np.mean(dists)
-print(mean_dist)
+
 start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_sarr = node_walkers(sarr, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_sarr = build_trans_rates_matrix(sarr, ind_to_pos, v)
+walk_sarr, _ = solve_continuous_rw_flow(sarr.copy(), trans_rates_sarr, Dt, n_walk)
+# walk_sarr = node_walkers(sarr, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_sarr = hd.reverse_negative_edges(walk_sarr)
 grad_sarr, sol_sarr, har_sarr, pot_sarr, div_sarr = hodge_decomposition(
-    walk_sarr, 'edge_visits')
+    rev_sarr, 'edge_visits')
 # %%
 with open('sarr_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_sarr)+'\n')
@@ -1498,7 +1583,7 @@ with open('sarr_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_sarr)+'\n')
 file.close()
 # %%
-plot_hodge(walk_sarr, grad_sarr, sol_sarr, har_sarr, pot_sarr, div_sarr, ind_to_pos)
+plot_hodge(rev_sarr, grad_sarr, sol_sarr, har_sarr, pot_sarr, div_sarr, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1530,11 +1615,17 @@ start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_gracia = node_walkers(gracia, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_gracia = build_trans_rates_matrix(gracia, ind_to_pos, v)
+walk_gracia, _ = solve_continuous_rw_flow(gracia.copy(), trans_rates_gracia, Dt, n_walk)
+
+# walk_gracia = node_walkers(gracia, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_gracia = hd.reverse_negative_edges(walk_gracia)
 grad_gracia, sol_gracia, har_gracia, pot_gracia, div_gracia = hodge_decomposition(
-    walk_gracia, 'edge_visits')
+    rev_gracia, 'edge_visits')
 # %%
 with open('gracia_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_gracia)+'\n')
@@ -1544,7 +1635,7 @@ with open('gracia_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_gracia)+'\n')
 file.close()
 # %%
-plot_hodge(walk_gracia, grad_gracia, sol_gracia, har_gracia, pot_gracia, div_gracia, ind_to_pos)
+plot_hodge(rev_gracia, grad_gracia, sol_gracia, har_gracia, pot_gracia, div_gracia, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1576,11 +1667,18 @@ start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_horta = node_walkers(horta, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_horta = build_trans_rates_matrix(horta, ind_to_pos, v)
+walk_horta, _ = solve_continuous_rw_flow(horta.copy(), trans_rates_horta, Dt, n_walk)
+
+# walk_horta = node_walkers(horta, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_horta = hd.reverse_negative_edges(walk_horta)
+
 grad_horta, sol_horta, har_horta, pot_horta, div_horta = hodge_decomposition(
-    walk_horta, 'edge_visits')
+    rev_horta, 'edge_visits')
 # %%
 with open('horta_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_horta)+'\n')
@@ -1590,7 +1688,7 @@ with open('horta_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_horta)+'\n')
 file.close()
 # %%
-plot_hodge(walk_horta, grad_horta, sol_horta, har_horta, pot_horta, div_horta, ind_to_pos)
+plot_hodge(rev_horta, grad_horta, sol_horta, har_horta, pot_horta, div_horta, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1617,17 +1715,23 @@ bin_width = bins[1] - bins[0]
 integral = bin_width * sum(n[0:1])
 print(integral)
 #%%
-mean_dist = np.mean(dists)
-print(mean_dist)
+
 start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_noub = node_walkers(noub, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_noub = build_trans_rates_matrix(noub, ind_to_pos, v)
+walk_noub, _ = solve_continuous_rw_flow(noub.copy(), trans_rates_noub, Dt, n_walk)
+
+# walk_noub = node_walkers(noub, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_noub = hd.reverse_negative_edges(walk_noub)
+
 grad_noub, sol_noub, har_noub, pot_noub, div_noub = hodge_decomposition(
-    walk_noub, 'edge_visits')
+    rev_noub, 'edge_visits')
 # %%
 with open('noub_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_noub)+'\n')
@@ -1637,7 +1741,7 @@ with open('noub_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_noub)+'\n')
 file.close()
 # %%
-plot_hodge(walk_noub, grad_noub, sol_noub, har_noub, pot_noub, div_noub, ind_to_pos)
+plot_hodge(rev_noub, grad_noub, sol_noub, har_noub, pot_noub, div_noub, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1669,11 +1773,19 @@ start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_st_and = node_walkers(st_and, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_st_and = build_trans_rates_matrix(st_and, ind_to_pos, v)
+walk_st_and, _ = solve_continuous_rw_flow(st_and.copy(), trans_rates_st_and, Dt
+                                          , n_walk)
+
+# walk_st_and = node_walkers(st_and, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_st_and = hd.reverse_negative_edges(walk_st_and)
+
 grad_st_and, sol_st_and, har_st_and, pot_st_and, div_st_and = hodge_decomposition(
-    walk_st_and, 'edge_visits')
+    rev_st_and, 'edge_visits')
 # %%
 with open('st_and_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_st_and)+'\n')
@@ -1716,11 +1828,19 @@ start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
-walk_st_mart = node_walkers(st_mart, Dt, v, ind_to_pos, n_walk)
+
+#THEO
+trans_rates_st_mart = build_trans_rates_matrix(st_mart, ind_to_pos, v)
+walk_st_mart, _ = solve_continuous_rw_flow(st_mart.copy(), trans_rates_st_mart,
+                                           Dt, n_walk)
+
+# walk_st_mart = node_walkers(st_mart, Dt, v, ind_to_pos, n_walk)
 print("--- %s seconds ---" % (time.time() - start_time))
 # %%
+rev_st_mart = hd.reverse_negative_edges(walk_st_mart)
+
 grad_st_mart, sol_st_mart, har_st_mart, pot_st_mart, div_st_mart = hodge_decomposition(
-    walk_st_mart, 'edge_visits')
+    rev_st_mart, 'edge_visits')
 # %%
 with open('st_mart_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(grad_st_mart)+'\n')
@@ -1730,7 +1850,7 @@ with open('st_mart_dec_dt_15_connected.txt', 'w') as file:
     file.write(str(div_st_mart)+'\n')
 file.close()
 # %%
-plot_hodge(walk_st_mart, grad_st_mart, sol_st_mart, har_st_mart, pot_st_mart, div_st_mart, ind_to_pos)
+plot_hodge(rev_st_mart, grad_st_mart, sol_st_mart, har_st_mart, pot_st_mart, div_st_mart, ind_to_pos)
 
 # %%
 dict_ls = []
@@ -1739,6 +1859,38 @@ with open('st_mart_dec.txt', 'r', newline='\n') as file:
     for i in data:
         dict_ls.append(eval(i))
 file.close()
+
+
+#%% AL THE CITY
+
+'ALL THE CITY'
+
+distr_ind = 0
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+
+bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
+
+#%%
+start_time = time.time()
+v = 1.42
+Dt = 15*60
+n_walk = 20
+
+#THEO
+trans_rates_bcn = build_trans_rates_matrix(bcn_graph, ind_to_pos, v)
+walk_bcn, _ = solve_continuous_rw_flow(bcn_graph.copy(), trans_rates_bcn,
+                                           Dt, n_walk)
+
+# walk_st_mart = node_walkers(st_mart, Dt, v, ind_to_pos, n_walk)
+print("--- %s seconds ---" % (time.time() - start_time))
+
+rev_bcn = hd.reverse_negative_edges(walk_bcn)
+
+grad_bcn, sol_bcn, har_bcn, pot_bcnt, div_bcn = hodge_decomposition(
+    rev_bcn, 'edge_visits')
+
+plot_hodge(rev_bcn, grad_bcn, sol_bcn, har_bcn, pot_bcnt, div_bcn, ind_to_pos)
 
 #%%BUILDING A LATTICE GRAPH WITH PERIODIC BOUNDARY CONDITIONS AND ADDING NODES
 #AT THE CENTRE

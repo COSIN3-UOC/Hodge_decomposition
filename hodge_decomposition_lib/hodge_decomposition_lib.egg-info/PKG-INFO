@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: hodge-decomposition-lib
-Version: 0.1.0
-Summary: My first Python library
+Version: 0.1.1
+Summary: This library performs the Hodge Decomposition of a graph in     networkx. The graph must be Directed and weighted with an arbitrary flow         called edge_visits
 Author: Robert Benassai Dalmau
 License: MIT

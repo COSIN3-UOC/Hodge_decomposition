@@ -259,15 +259,15 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
 
     '''
 
+
     edge_graph = nx.get_edge_attributes(walk_graph, 'edge_visits')
     
     g_field = np.array([walk_graph[edge[0]][edge[1]]['edge_visits'] for edge
                                      in walk_graph.edges])
     percentile = np.percentile(g_field, 95)
-    percentile_g = np.percentile(list(grad_comp.values()), 95)
-    percentile_s = np.percentile(list(sol_comp.values()), 95)
-    percentile_h = np.percentile(list(har_comp.values()), 95)
+    percentile_pot = np.percentile(list(pot.values()), 95)
     
+
     w = np.array(list(edge_graph.values()))
     wg = np.array(list(grad_comp.values()))
     ws = np.array(list(sol_comp.values()))
@@ -280,18 +280,18 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # und_walk = walk_graph.to_undirected()
     # betweenness_cent = nx.betweenness_centrality(und_walk, weight = 
     #                                              'dt', normalized =False)
-    # deg = walk_graph.degree()
-    # deg_dict = {node[0]: node[1] for node in deg}
-    plt.subplots(2, 2, figsize=(12, 9))
+    deg = walk_graph.degree()
+    deg_dict = {node[0]: node[1] for node in deg}
+    plt.subplots(2, 2, figsize=(15, 15))
     plt.subplot(221)
-    plt.title('Original Graph 100%')
+    plt.title('Original Graph 100%', fontsize = 20)
 
     # color_p = np.abs(np.array(list(edge_graph.values())))
     color_p = np.array(list(edge_graph.values()))
     # colors = np.linspace(0, percentile)
     # cmap = plt.cm.Oranges
-    colors = np.linspace(-percentile, percentile)
-    cmap = plt.cm.seismic
+    colors = np.linspace(0, percentile)
+    cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
 
@@ -302,18 +302,20 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # vmax_div = round(max(color_div))
 
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4, 
-                            node_color='#D3D3D3')
+                           node_color='#D3D3D3')
                             # node_color=color_div, cmap=cmap_div, vmin=vmin_div,
                             # vmax=vmax_div)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_p,
-                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                            arrowsize = 5, node_size = 4)
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
+                           arrowsize = 5, node_size = 4)
 
     sm = plt.cm.ScalarMappable(cmap=cmap, 
-                                norm=plt.Normalize(vmin=vmin, vmax=vmax))
+                               norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
     cbar.set_label(r'$\omega$', fontsize = 18)
+    cbar.ax.tick_params(labelsize=18)
+
 
     # sm2 = plt.cm.ScalarMappable(cmap=cmap_div, norm=plt.Normalize(vmin=vmin_div,
     #                                                               vmax=vmax_div))
@@ -322,54 +324,56 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # cbar2.set_label(r'Node div')
 
     plt.subplot(222)
-    color_g = np.array(list(grad_comp.values()))
+    color_g = np.abs(np.array(list(grad_comp.values())))
     # plotting edges with color gradient
 
     color_pot = list(pot.values())
     cmap_pot = plt.cm.PRGn
-    vmax_pot = int(np.max(color_pot))
-    vmin_pot = int(np.min(color_pot))
+    # vmax_pot = max([int(np.max(color_pot)), int(np.abs(np.min(color_pot)))])
+    vmax_pot = percentile_pot
+    vmin_pot = -vmax_pot
+    # vmax_pot = np.max(color_pot)
+    # vmin_pot = np.min(color_pot)
 
-
-    colors = np.linspace(0, percentile_g)
+    colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
-    plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%', fontsize = 18)
+    plt.title('Gradient component ' + str(round(weight_g*100, 1))+'%', fontsize = 20)
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None,
-                            node_size=30, node_color=color_pot, cmap=cmap_pot,
+                            node_size=8, node_color=color_pot, cmap=cmap_pot,
                             vmin=vmin_pot, vmax=vmax_pot)
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_g,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax, 
-                           arrowsize = 5, node_size = 30)
+                           arrowsize = 5, node_size = 8)
 
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
-    cbar.set_label(r'$\omega_g$', fontsize = 18 )
+    cbar.set_label(r'$\left|\omega_g\right|$', fontsize = 18)
     cbar.ax.tick_params(labelsize=18)
-
+    
     sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin=vmin_pot,
                                                                   vmax=vmax_pot))
     sm2._A = []
     cbar2 = plt.colorbar(sm2, location='right')
     cbar2.set_label(r'Node potentials', fontsize = 18)
-    cbar2.ax.tick_params(labelsize=18)
-
-    colors = np.linspace(0, percentile_s)
+    cbar2.ax.tick_params(labelsize = 18)
+    
+    colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
 
     color_s = np.abs(np.array(list(sol_comp.values())))
     plt.subplot(223)
-    plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%')
+    plt.title('Solenoidal Component ' + str(round(weight_s*100, 1))+'%', fontsize = 20)
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
-                            node_color='#D3D3D3')
+                           node_color='#D3D3D3')
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_s,
-                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                            arrowsize = 5, node_size = 4)
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
+                           arrowsize = 5, node_size = 4)
 
 
     sm = plt.cm.ScalarMappable(
@@ -378,30 +382,31 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     cbar = plt.colorbar(sm)
     cbar.set_label(r'$\left|\omega_s\right|$', fontsize = 18)
     cbar.ax.tick_params(labelsize=18)
-
-    colors = np.linspace(0, percentile_h)
+    
+    
+    colors = np.linspace(0, percentile)
     cmap = plt.cm.Oranges
     vmin = min(colors)
     vmax = max(colors)
 
     color_h = np.array(list(har_comp.values()))
     plt.subplot(224)
-    plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%')
+    plt.title('Harmonic Component ' + str(round(weight_h*100, 1))+'%', fontsize = 20)
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None, node_size=4,
-                            node_color='#D3D3D3')
+                           node_color='#D3D3D3')
     nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_h,
-                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
-                            arrowsize = 5, node_size = 4)
+                           edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
+                           arrowsize = 5, node_size = 4)
     sm = plt.cm.ScalarMappable(
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
     cbar.set_label(r'$\left|\omega_h\right|$', fontsize = 18)
     cbar.ax.tick_params(labelsize=18)
-
     plt.tight_layout()
     # plt.savefig('/Users/robertbenassai/Documents/UOC/figs/lattice_evolution/lattice_dt'+str(Dt)+'.png')
     plt.show()
+
     
 def reverse_negative_edges(G):
     edge_ls = list(G.edges)
