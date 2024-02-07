@@ -14,7 +14,8 @@ This project aims to find the effects of urban and pedestrian network geometry o
 
 ## Features
 
-Thre main code where the project has been developed is "walker_dynamics.py"
+Thre main code where the project has been developed is "walker_dynamics.py".
+You can use *hodge_decomposition_lib* as a library to perform the hodge decomposition on a Networkx DiGraph object.
 
 ## Installation
 
