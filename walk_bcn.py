@@ -1871,8 +1871,8 @@ path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/03
 
 bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
+
 #%%
-start_time = time.time()
 v = 1.42
 Dt = 15*60
 n_walk = 20
@@ -1883,12 +1883,16 @@ walk_bcn, _ = solve_continuous_rw_flow(bcn_graph.copy(), trans_rates_bcn,
                                            Dt, n_walk)
 
 # walk_st_mart = node_walkers(st_mart, Dt, v, ind_to_pos, n_walk)
-print("--- %s seconds ---" % (time.time() - start_time))
+print('walk finished')
 
 rev_bcn = hd.reverse_negative_edges(walk_bcn)
 
+print('reverse finished')
+
 grad_bcn, sol_bcn, har_bcn, pot_bcnt, div_bcn = hodge_decomposition(
     rev_bcn, 'edge_visits')
+
+print('HHD finished')
 
 plot_hodge(rev_bcn, grad_bcn, sol_bcn, har_bcn, pot_bcnt, div_bcn, ind_to_pos)
 
@@ -1960,9 +1964,9 @@ PBC_lattice.remove_edges_from([((3,3),(3,4)), ((3, 3), (4,3)), ((3,4), (4,4)),
                                ((4,3), (4,4))])
 PBC_lattice.add_nodes_from(new_vertexes)
 PBC_lattice.add_edges_from(new_edges)
-#pos = {i * N + j:(i, j) for i, j in PBC_lattice.nodes()}
+
 pos = {i: j for i,j in enumerate(PBC_lattice.nodes)}
-#labels = dict( ((i, j), i * N + j) for i, j in PBC_lattice.nodes() )
+
 labels = {i: k for k, i in enumerate(PBC_lattice.nodes)}
 nx.relabel_nodes(PBC_lattice, labels, copy=False)
 

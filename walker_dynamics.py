@@ -1318,6 +1318,7 @@ plot_pot_corr(pot_discr_sim, pot_discr_th, 'Simulated Potential',
 plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component', 
                'Analytical gradient component')
 #%% NODE-CENTRIC WALK
+
 Dt = 200
 n_walk = 200
 v = 1
@@ -1736,9 +1737,11 @@ times = np.linspace(0.1, 201.1, 100)
 
 diff_ls = []
 err_ls = []
-
+# total_comp = har_evo+sol_evo+grad_evo
+# mean_tot = np.mean(np.array(total_comp)[:, 1:])
+# theo_MSD = np.zeros_like(times)
 # for track_edge in erd_reny.edges:
-track_edge = (11,17)
+track_edge = (29,36)
 total_comp = har_evo.iloc[:, key_dict[track_edge]]+sol_evo.iloc[:, key_dict[track_edge]]\
                                             +grad_evo.iloc[:, key_dict[track_edge]]
    
@@ -1750,14 +1753,20 @@ slope /= len(erd_reny.nodes)
 
 params, pcov = curve_fit(func, times, total_comp/(len(erd_reny.nodes)))
 perr_weights = np.sqrt(np.diag(pcov))
-
-diff_ls.append([round(slope, 5), params[0]])    
-err_ls.append(perr_weights[0])
-                                    
+    
+    # diff_ls.append([round(slope, 5), params[0]])    
+    # err_ls.append(perr_weights[0])
+    # theo_MSD += slope*times/erd_reny.number_of_edges()
+    
 plt.plot(times, har_evo.iloc[:, key_dict[track_edge]]/(len(erd_reny.nodes)), 'b', label = 'Harmonic')
 plt.plot(times, grad_evo.iloc[:, key_dict[track_edge]]/(len(erd_reny.nodes)), 'g', label = 'Gradient')
 plt.plot(times, sol_evo.iloc[:, key_dict[track_edge]]/(len(erd_reny.nodes)), 'r', label = 'Solenoidal')
 plt.plot(times, total_comp/(len(erd_reny.nodes)), 'orange', label = 'Total')
+
+# plt.plot(times, np.mean(np.array(har_evo)[:, 1:], axis = 1)/(len(erd_reny.nodes)), 'b', label = 'Harmonic')
+# plt.plot(times, np.mean(np.array(grad_evo)[:, 1:], axis = 1)/(len(erd_reny.nodes)), 'g', label = 'Gradient')
+# plt.plot(times, np.mean(np.array(sol_evo)[:, 1:], axis = 1)/(len(erd_reny.nodes)), 'r', label = 'Solenoidal')
+# plt.plot(times, np.mean(np.array(total_comp)[:, 1:], axis = 1)/(len(erd_reny.nodes)), 'orange', label = 'Total')
 
 # times = np.linspace(0.1, 101.1, 300)
 # plt.plot(times,har_evo_th.iloc[:, key_dict[track_edge]], 'b--', label = 'Harmonic')
@@ -1784,6 +1793,8 @@ plt.scatter(*zip(*diff_ls), s = 10)
 
 solution_ER[-1]
 #%% ADJOINT MATRIX
+
+'''ADJOINT RANDOM WALKS'''
 
 def build_adjoint_graph(G:nx.DiGraph()):
     '''
