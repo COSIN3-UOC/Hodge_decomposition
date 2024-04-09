@@ -174,8 +174,7 @@ def absorbing_walkers(G, n_walk):
     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
     return(G)
 
-# %% OPTIMIZED NODE_WALKERS (time/n_wak = 11s for clusters of 100 points)
-
+# %% OPTIMIZED NODE_WALKERS
 def node_walkers(G, Dt, v, pos, n_walk):
     '''
     Function that puts n = len(list(G.nodes)) random walkers in a Digraph
@@ -226,10 +225,10 @@ def node_walkers(G, Dt, v, pos, n_walk):
         pos_walkers = {}
         walk_iter = 0
         for node in G.nodes:
-            degree_n = G.degree[node]
-            for k in range(degree_n):
-                pos_walkers[walk_iter] = node
-                walk_iter += 1
+            # degree_n = G.degree[node]
+            # for k in range(degree_n):
+            pos_walkers[walk_iter] = node
+            walk_iter += 1
         path = []
         # edge_weights counts the amount of times a walker has visited each 
         # edge in 1 realisation
@@ -837,7 +836,7 @@ def find_triangles(G):
 
 # building the transition rate matrix
 #dict of matrix ind to node index
-def build_trans_rates_matrix(G, pos, v):#, new_edges, short_1, short_2):
+def build_trans_rates_matrix(G, pos, v, alpha):
     '''
     Builds the transition rates matrix or generator matrix for an unweighted 
     random walk in a topological graph Rij = v/(k_j*Dx_ij)
@@ -859,7 +858,9 @@ def build_trans_rates_matrix(G, pos, v):#, new_edges, short_1, short_2):
     G_und = G.to_undirected()
     
     #distances of the edges in the graph
-    dists = {edge: np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
+    # dists = {edge: alpha + (1-alpha)*np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
+    #         for edge in G_und.edges}
+    dists = {edge:  np.linalg.norm(np.array(pos[edge[0]])-np.array(pos[edge[1]]))/v
             for edge in G_und.edges}
     # print(Counter(dists.values()))
     # # ONLY FOR PBC_LATTICE ----------------------------------------------------
@@ -875,18 +876,6 @@ def build_trans_rates_matrix(G, pos, v):#, new_edges, short_1, short_2):
     #         dists[(i*N, i*N+N-1)] = lattice_gap
     #         dists[(i*N+N-1, i*N)] = lattice_gap
     # -------------------------------------------------------------------------
-    # for new_e in new_edges:
-    #     if new_e in dists.keys():
-    #         if dists[new_e] == 0.25:
-    #             dists[new_e] /= short_1
-    #         else:
-    #             dists[new_e] /= short_2
-    #     else:
-    #         orig_dist = dists[(new_e[1], new_e[0])]
-    #         if orig_dist == 0.25:
-    #             dists[(new_e[1], new_e[0])] /= short_1
-    #         else:
-    #             dists[(new_e[1], new_e[0])] /= short_2
 
     #mapping of each node to its index in the transition rate array
     inode_to_iarr = {node:i for i, node in enumerate(G_und.nodes)}
@@ -1103,7 +1092,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     # plotting edges with color gradient
 
     color_pot = list(pot.values())
-    cmap_pot = plt.cm.PRGn
+    cmap_pot = plt.cm.copper
     vmax_pot = np.max(color_pot)
     vmin_pot = np.min(color_pot)
 
@@ -1116,7 +1105,7 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
     nx.draw_networkx_nodes(walk_graph, pos=pos, label=None,
                             node_size=30, node_color=color_pot, cmap=cmap_pot,
                             vmin=vmin_pot, vmax=vmax_pot)
-    nx.draw_networkx_edges(walk_graph, pos=pos, label=None, edge_color=color_g,
+    nx.draw_networkx_edges(walk_graph, pos=pos, edgelist = grad_comp.keys(), label=None, edge_color=color_g,
                            edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax, 
                            arrowsize = 9, node_size = 30, width = 1.5)
 
@@ -1124,8 +1113,8 @@ def plot_hodge(walk_graph, grad_comp, sol_comp, har_comp, pot, div, pos):
         cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
     sm._A = []
     cbar = plt.colorbar(sm)
-    # cbar.set_label(r'$\omega_g$', fontsize = 18 )
-    cbar.set_label(r'edge probability', fontsize = 18 )
+    cbar.set_label(r'$\omega_g$', fontsize = 18 )
+    # cbar.set_label(r'edge probability', fontsize = 18 )
     cbar.ax.tick_params(labelsize=18)
 
     sm2 = plt.cm.ScalarMappable(cmap=cmap_pot, norm=plt.Normalize(vmin=vmin_pot,
@@ -1190,7 +1179,8 @@ def reverse_negative_edges(G):
             #reversing edge
             G.add_edge(edge[1], edge[0], edge_visits = -flow)
     return G
-#%%
+
+
 def plot_pot_corr(pot_sim, pot_theo, x_label, y_label):
     pot_list = [(pot_sim[i], pot_theo[i]) for i in pot_sim.keys()]
     x, y = zip(*pot_list)
@@ -1201,12 +1191,13 @@ def plot_pot_corr(pot_sim, pot_theo, x_label, y_label):
     plt.ylabel(y_label, fontsize = 20)
     plt.xticks(fontsize = 18)
     plt.yticks(fontsize = 18)
+    plt.plot(sorted(x), sorted(x), c='r', ls = '--', label = 'y = x')
     plt.scatter(x, y, s = 18)
-    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = 'f'{a:.2f}'+r'$\pm$'
-             +''f'{std_err:.2f}'+'x + 'f'{b:0.1f}'+'\n'+r'$r^2 = $' 
-             +str(round(r_value**2, 2)))
-    plt.plot(x, np.array(x), c='r', label = 'y = x')
-    plt.legend(fontsize = 18)
+    # plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = 'f'{a:.2f}'+r'$\pm$'
+    #          +''f'{std_err:.2f}'+'x + 'f'{b:0.1f}'+'\n'+r'$r^2 = $' 
+    #          +str(round(r_value**2, 2)))
+    print(r'$r^2 = $', r_value**2)
+    # plt.legend(fontsize = 18)
     plt.tight_layout()
 # PLOT OF PREDICTED VS SIMULATED GRADIENT COMPONENT 
 def plot_grad_corr(grad_sim, grad_theo, x_label, y_label):
@@ -1219,15 +1210,17 @@ def plot_grad_corr(grad_sim, grad_theo, x_label, y_label):
     plt.ylabel(y_label,  fontsize = 20)
     plt.xticks(fontsize = 20)
     plt.yticks(fontsize = 20)
+    plt.plot(sorted(x), sorted(x), c='r', ls = '--', label = 'y = x')
     plt.scatter(x, y, s = 18)
-    plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = 'f'{a:.2f}'+r'$\pm$'
-             +''f'{std_err:.2f}'+'x + 'f'{b:0.1f}'+'\n'+r'$r^2 = $' 
-             +str(round(r_value**2, 2)))
-    plt.plot(x, np.array(x), c='r', label = 'y = x')
-    plt.legend(fontsize = 18)
+    # plt.plot(x, a*np.array(x)+b, c = 'black', label = 'y = 'f'{a:.2f}'+r'$\pm$'
+    #          +''f'{std_err:.2f}'+'x + 'f'{b:0.1f}'+'\n'+r'$r^2 = $' 
+    #          +str(round(r_value**2, 2)))
+    print(r'$r^2 = $', r_value**2)
+    # plt.legend(fontsize = 18)
     plt.tight_layout()
 
-#%%Structural_ratios
+# Structural_ratios
+
 #calculates the ratio between the dimension of each hodge component and the dim
 #of the original graph
 def structural_ratios(G):
@@ -1239,112 +1232,9 @@ def structural_ratios(G):
     dim_curl, _ = find_triangles(G) #dimension of curl is the number of linearly 
                                     #independent triangles
     return(dim_grad/dim_orig, dim_curl/dim_orig, 1-dim_grad/dim_orig-dim_curl/dim_orig)
-#%% ERDOS_RENYI
 
-'''------------------Testing with an Erdös-Rényi graph----------------------'''
+# Probability evolution for the node centric
 
-''' Building the graph'''
-
-erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
-erd_reny = erd_reny.to_directed()
-out_edges = [edge for edge in erd_reny.edges if edge[1]
-    < edge[0]]  # removing all outward edges
-erd_reny.remove_edges_from(out_edges)
-pos_ER = nx.spring_layout(erd_reny, seed = 1050)
-nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
-
-#%% Random Geometric
-# Use seed when creating the graph for reproducibility
-G = nx.random_geometric_graph(50, 0.2, seed=1000)
-# position is stored as node attribute data for random_geometric_graph
-pos_ER = nx.get_node_attributes(G, "pos")
-# transforming the graph into a digraph
-erd_reny = nx.DiGraph(G)
-out_edges = [edge for edge in erd_reny.edges if edge[1]
-    < edge[0]]  # removing all outward edges
-erd_reny.remove_edges_from(out_edges)
-
-nx.draw_networkx(erd_reny, with_labels = True, node_size = 50, pos = pos_ER)
-
-#%%
-dists = np.array([np.linalg.norm(np.array(pos_ER[edge[1]])-np.array(pos_ER[edge[0]]))
-         for edge in erd_reny.edges])
-
-n, bins, _ = plt.hist(dists, bins = 20,range=(0,1))
-bin_width = bins[1] - bins[0]
-# sum over number in each bin and mult by bin width, which can be factored out
-integral = bin_width * sum(n[0:1])
-print(integral)
-#%%
-# Set common styling parameters
-common_params = {
-    "node_size": 100,
-    "node_color": "#2B81F2",
-    "linewidths": 2,
-    "edgecolors": "black",
-}
-
-# Draw nodes and edges
-nx.draw_networkx_nodes(erd_reny, pos=pos_ER, **common_params)
-nx.draw_networkx_edges(erd_reny, pos=pos_ER, width=2, arrowstyle="-|>", 
-                       connectionstyle="arc3,rad=0.0", node_size=100)
-
-#%% DISCRETE WALK
-
-#SIM DISCR
-steps = 10
-n_walk = 20
-
-discr_walk_ER, occupations_disc = digraph_walkers(erd_reny.copy(), steps, n_walk)
-
-grad_discr_sim, sol_discr_sim, har_discr_sim, pot_discr_sim, div_discr_sim = \
-    hd.hodge_decomposition(discr_walk_ER, 'edge_visits')
-    
-hd.plot_hodge(discr_walk_ER, grad_discr_sim, sol_discr_sim, har_discr_sim, 
-              pot_discr_sim, div_discr_sim, pos_ER)
-#%%
-#THEO DISCR
-trans_matrix = build_trans_matrix(erd_reny.copy())
-discr_ER_theo, theo_occupations = discrete_rw_edge_flow(erd_reny.copy(), 
-                                                        trans_matrix, steps, n_walk)
-
-grad_discr_th, sol_discr_th, har_discr_th, pot_discr_th, div_discr_th = \
-    hd.hodge_decomposition(discr_ER_theo, 'edge_visits')
-    
-#%% PLOT OF PREDICTED VS SIMULATED POTENTIALS DTRW
-
-plot_pot_corr(pot_discr_sim, pot_discr_th, 'Simulated Potential', 
-              'Analytical Potential')
-plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component', 
-               'Analytical gradient component')
-#%% NODE-CENTRIC WALK
-
-Dt = 200
-n_walk = 200
-v = 1
-
-# THEORETICAL 
-trans_rate_ER = build_trans_rates_matrix(erd_reny.copy(), pos_ER, v)
-ER_th, solution_ER, curls_ER = solve_continuous_rw_flow(erd_reny.copy(), trans_rate_ER, Dt, n_walk)
-g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new = hd.hodge_decomposition(ER_th, 'edge_visits')
-print(np.max(curls_ER))
-#%% SIMULATION
-
-walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
-grad_ER, sol_ER, har_ER, pot_ER, div_ER = hd.hodge_decomposition(walked_ER, 'edge_visits')
-#%%
-plot_hodge(ER_th, g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new,
-           pos_ER)
-#%%
-
-plot_hodge(walked_ER, grad_ER, sol_ER, har_ER, pot_ER, div_ER,
-           pos_ER)
-#%%
-plot_pot_corr(pot_ER, pot_cont_new, 'Simulated Potential', 
-              'Analytical Potential')
-plot_grad_corr(grad_ER, g_cont_new, 'Simulated gradient component', 
-               'Analytical gradient component')
-#%% Probability evolution for the node centric
 import math
 
 def get_node_probabilities_nc(G, Dt, n_intervals, paths, numb_walkers, n_walk):
@@ -1389,7 +1279,6 @@ def get_node_probabilities_nc(G, Dt, n_intervals, paths, numb_walkers, n_walk):
             nodes = step[0]
             times = step[1]
             for node, t in zip(nodes, times):
-
                 if i == 0:
                     j = 0
                     occupation_evo_df.iloc[j, index] = node
@@ -1423,10 +1312,77 @@ def get_node_probabilities_nc(G, Dt, n_intervals, paths, numb_walkers, n_walk):
     occupation_df = occupation_df.divide(n_walk*numb_walkers)
     
     return(occupation_df)
+#%% ERDOS_RENYI
+
+'''------------------Testing with an Erdös-Rényi graph----------------------'''
+
+''' Building the graph'''
+
+erd_reny = nx.erdos_renyi_graph(50, 0.1, seed = 1000, directed=False)
+erd_reny = erd_reny.to_directed()
+out_edges = [edge for edge in erd_reny.edges if edge[1]
+    < edge[0]]  # removing all outward edges
+erd_reny.remove_edges_from(out_edges)
+pos_ER = nx.spring_layout(erd_reny, seed = 1050)
+nx.draw_networkx(erd_reny, with_labels = False, node_size = 20, pos = pos_ER)
+
+#%% Random Geometric
+# Use seed when creating the graph for reproducibility
+G = nx.random_geometric_graph(50, 0.2, seed=1000)
+# position is stored as node attribute data for random_geometric_graph
+pos_ER = nx.get_node_attributes(G, "pos")
+# transforming the graph into a digraph
+erd_reny = nx.DiGraph(G)
+out_edges = [edge for edge in erd_reny.edges if edge[1]
+    < edge[0]]  # removing all outward edges
+erd_reny.remove_edges_from(out_edges)
+
+nx.draw_networkx(erd_reny, with_labels = True, node_size = 50, pos = pos_ER)
+
+#%% PLOT THE GRAPH
+# Set common styling parameters
+common_params = {
+    "node_size": 100,
+    "node_color": "#2B81F2",
+    "linewidths": 2,
+    "edgecolors": "black",
+}
+
+# Draw nodes and edges
+nx.draw_networkx_nodes(G, pos=pos_ER, **common_params)
+nx.draw_networkx_edges(G, pos=pos_ER, width=2, 
+                       connectionstyle="arc3,rad=0.0", node_size=100)
+
+#%% DISCRETE WALK
+
+# SIMULATION DISCR
+steps = 50
+n_walk = 200
+
+discr_walk_ER, occupations_disc = digraph_walkers(erd_reny.copy(), steps, n_walk)
+
+grad_discr_sim, sol_discr_sim, har_discr_sim, pot_discr_sim, div_discr_sim = \
+    hd.hodge_decomposition(discr_walk_ER, 'edge_visits')
+    
+hd.plot_hodge(discr_walk_ER, grad_discr_sim, sol_discr_sim, har_discr_sim, 
+              pot_discr_sim, div_discr_sim, pos_ER)
+#%% THEORETICAL DISCR
+
+trans_matrix = build_trans_matrix(erd_reny.copy())
+discr_ER_theo, theo_occupations = discrete_rw_edge_flow(erd_reny.copy(), 
+                                                        trans_matrix, steps, n_walk)
+
+grad_discr_th, sol_discr_th, har_discr_th, pot_discr_th, div_discr_th = \
+    hd.hodge_decomposition(discr_ER_theo, 'edge_visits')
+    
+#%% PLOT OF PREDICTED VS SIMULATED POTENTIALS DTRW
+
+plot_pot_corr(pot_discr_sim, pot_discr_th, 'Simulated Potential', 
+              'Analytical Potential')
+plot_grad_corr(grad_discr_sim, grad_discr_th, 'Simulated gradient component', 
+               'Analytical gradient component')
+
 #%% DISCR PROB EVO
-n_intervals = 500
-numb_walkers = len(erd_reny.nodes)
-occupation_df = get_node_probabilities_nc(erd_reny, Dt, n_intervals, paths, numb_walkers)
 
 from matplotlib.lines import Line2D
 custom_lines = [Line2D([0], [0], color='black', ls = '-.'),
@@ -1437,7 +1393,7 @@ color_p = sns.color_palette(palette = 'colorblind', n_colors = len(erd_reny.node
 plt.figure(figsize = (8,6))
 theo_evo = np.array([list(element.values()) for element in theo_occupations])
 sim_evo = np.array([list(element.values()) for element in occupations_disc])
-print(nx.degree(erd_reny))
+
 for i in range(len(erd_reny.nodes)):
     plt.plot(time, sim_evo[:,i]/(10*n_walk), ls = '-.', c = color_p[i])
     plt.plot(time, theo_evo[:,i]/10, ls = '-', c = color_p[i])
@@ -1449,11 +1405,43 @@ plt.yticks(fontsize = 18)
 plt.legend(custom_lines, ['simulation', 'theoretical'], loc='upper center', 
            ncol = 2, bbox_to_anchor=(0.5, 1), fontsize = 15)
 plt.tight_layout()
+#%% NODE-CENTRIC WALK
+
+Dt = 20
+n_walk = 200
+v = 1
+
+# THEORETICAL 
+trans_rate_ER = build_trans_rates_matrix(erd_reny.copy(), pos_ER, v, 0)
+ER_th, solution_ER, curls_ER = solve_continuous_rw_flow(erd_reny.copy(), trans_rate_ER, Dt, n_walk)
+g_cont_new, s_cont_new, h_cont_new, pot_cont_new, div_cont_new = hd.hodge_decomposition(ER_th, 'edge_visits')
+print(np.max(curls_ER))
+#%% SIMULATION NODE CENTRIC
+
+walked_ER, paths = node_centric(erd_reny.copy(), Dt, v, pos_ER, n_walk)
+grad_ER, sol_ER, har_ER, pot_ER, div_ER = hd.hodge_decomposition(walked_ER, 'edge_visits')
+
+#%% PLOT POTENTIALS AND GRADIENT COMPONENT NODE CENTRIC
+
+plot_pot_corr(pot_ER, pot_cont_new, 'Simulated Potential', 
+              'Analytical Potential')
+plot_grad_corr(grad_ER, g_cont_new, 'Simulated gradient component', 
+               'Analytical gradient component')
+
+#%% NODE CENTRIC PROBABILITY EVO
+
+n_intervals = 200
+numb_walkers = len(erd_reny.nodes)
+occupation_df = get_node_probabilities_nc(erd_reny, Dt, n_intervals, paths, 
+                                          numb_walkers, n_walk)
 #%%
-#NODE CENTRIC PROBABILITY EVO
 plt.figure(figsize = (8,6))
+color_p = sns.color_palette(palette = 'colorblind', n_colors = len(erd_reny.nodes))
+from matplotlib.lines import Line2D
+custom_lines = [Line2D([0], [0], color='black', ls = '-.'),
+                Line2D([0], [0], color = 'black', ls = '-')]
 t = np.linspace(0, Dt, 20000)
-t2 = np.linspace(0, Dt, 500)
+t2 = np.linspace(0, Dt, 200)
 sol = pd.DataFrame(solution_ER/len(erd_reny.nodes))
 plt.xlabel('time', fontsize = 18)
 plt.ylabel('Occupation probabilities', fontsize = 18)
@@ -1467,7 +1455,54 @@ for i in range(len(erd_reny.nodes)):
 plt.legend(custom_lines, ['simulation', 'theoretical'], loc='upper center', 
            ncol = 2, bbox_to_anchor=(0.5, 1), fontsize = 15)
 plt.tight_layout()
+#%% CONST VELOCITY EVO
 
+Dt = 20
+n_walk = 200
+v = 1
+walked_v_ER, path_tot_cnst_v = node_walkers(erd_reny.copy(), Dt, v, pos_ER, n_walk)
+grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, div_cnst_v = \
+    hd.hodge_decomposition(walked_v_ER,'edge_visits')
+    
+#%%
+
+plot_pot_corr(pot_cont_new, pot_cnst_v, 'CTRW Potential', 
+              r'const. $v$ Potential')
+plot_grad_corr(g_cont_new, grad_cnst_v, 'CTRW gradient component', 
+               r'const. $v$ gradient component')
+#%%
+n_intervals = 200
+numb_walkers = len(erd_reny.nodes)
+occupation_df_node = get_node_probabilities_nc(erd_reny, Dt, n_intervals, 
+                                               path_tot_cnst_v, numb_walkers, 
+                                               n_walk)
+#%%
+plt.figure(figsize = (8,6))
+t = np.linspace(0, Dt, 20000)
+t2 = np.linspace(0, Dt, 200)
+sol = pd.DataFrame(solution_ER/len(erd_reny.nodes))
+plt.xlabel('time', fontsize = 18)
+plt.ylabel('Occupation probabilities', fontsize = 18)
+plt.xticks(fontsize = 18)
+plt.yticks(fontsize = 18)
+
+e_dists = np.array([np.linalg.norm(np.array(pos_ER[edge[0]])-np.array(pos_ER[edge[1]]))/v
+        for edge in erd_reny.edges])
+D = np.sum(e_dists)
+
+for i in range(10):
+    color = color_p[i]
+    plt.plot(t,sol[i+10], c = color, ls = '-')
+    plt.plot(t2, occupation_df_node[i+10],c = color, ls = '--')
+    # plt.hlines(1/(trans_rate_ER[list(erd_reny.neighbors(i+10))[0]][i+10]*2*D), 0, 20, ls = '--', color = 'black')
+plt.legend(custom_lines, [r'simulation const. $v$', 'theoretical'], loc='upper center', 
+           ncol = 2, bbox_to_anchor=(0.5, 1), fontsize = 15)
+plt.tight_layout()
+
+
+#%%
+for i in range(len(erd_reny)):
+    plt.scatter(occupation_df_node[i][199], 1/(trans_rate_ER[list(erd_reny.neighbors(i))[0]][i]*2*D))
 #%% EVOLUTION OF SOLENOIDAL HARMONIC AND GRADIENT COMPONENTS WITH SIM TIME
 import csv
 n_walk = 20
@@ -2001,6 +2036,7 @@ pos_ER = nx.spring_layout(erd_reny, seed = 1050)
 nx.draw_networkx(erd_reny, with_labels = True, node_size = 500, pos = pos_ER)
 
 #%% Random Geometric
+
 # Use seed when creating the graph for reproducibility
 G = nx.random_geometric_graph(50, 0.2, seed=1000)
 # position is stored as node attribute data for random_geometric_graph
@@ -2353,19 +2389,6 @@ numb_walkers = 2*len(lattice.edges)
 
 occupation_df_ec_n = get_node_probabilities_ec(G, Dt, n_intervals, path_edges_ER, 
                                                numb_walkers, n_walk)
-#%% CONSTANT VELOCITY WALK
-Dt = 20
-n_walk = 200
-v = 0.5
-walked_v_ER, path_tot_cnst_v = node_walkers(lattice.copy(), Dt, v, pos_lat, n_walk)
-grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, div_cnst_v = \
-    hd.hodge_decomposition(walked_v_ER,'edge_visits')
-#%%
-
-plot_hodge(walked_v_ER, grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, 
-           div_cnst_v, pos_lat)
-total_fl_cnst_v = {edge:walked_v_ER[edge[0]][edge[1]]['edge_visits'] for edge in 
-                walked_v_ER.edges}
 #%% retreiving edge occupation probabilities from the constant speed RW
 
 def get_edge_probs_nc(G, Dt, n_intervals, path, numb_walkers, n_walk):
@@ -2721,23 +2744,39 @@ mark_inset(ax, zoom_ax, loc1=2, loc2=4, fc="none", ec="0.5")
 plt.tight_layout()
 plt.show()
 
-#%% curl prediction
+#%% NODE CENTRIC RW ON PBC MOD LATTICE
 Dt = 100
 n_walk = 100
 v = 1
 
 #theoretical
-trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v)
+trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, 0)
 
 PBC_th, solution_PBC, curl_theo = solve_continuous_rw_flow(PBC_lattice.copy(), trans_rate_PBC_nc, Dt, n_walk)
 
-stat_probs = {i: prob/len(PBC_lattice.nodes) for i, prob in enumerate(solution_PBC[-1])}
+stat_probs_nc = {i: prob/len(PBC_lattice.nodes) for i, prob in enumerate(solution_PBC[-1])}
 
 rev_PBC_th = reverse_negative_edges(PBC_th)
 
 grad_PBC_nc_th, sol_PBC_nc_th, har_PBC_nc_th, pot_PBC_nc_th, div_PBC_nc_th = \
     hd.hodge_decomposition(rev_PBC_th, 'edge_visits')
 
+N = 8
+periodic_edges = []
+for i in range(N):
+    periodic_edges.append((i, i+N*N-N))
+    if i==0:
+        periodic_edges.append((i,i+N-1))
+    else:
+        periodic_edges.append((i*N, i*N+N-1))
+        
+
+for p_e in periodic_edges:
+    try:
+        grad_PBC_nc_th.pop(p_e)
+    except:
+        grad_PBC_nc_th.pop((p_e[1], p_e[0]))
+        
 plot_hodge(rev_PBC_th, grad_PBC_nc_th, sol_PBC_nc_th, har_PBC_nc_th, stat_probs,
            div_PBC_nc_th, pos_PBC)
 #%%
@@ -2747,7 +2786,7 @@ grad_PBC_nc, sol_PBC_nc, har_PBC_nc, pot_PBC_nc, div_PBC_nc = \
     hd.hodge_decomposition(walked_nc_PBC, 'edge_visits')
 
 print('curl theo', curl_theo)
-#%% NODE CENTRIC RW ON PBC MOD LATTICE
+#%% HISTOGRAMS OF CYCLIC COMPONENTS
 Dt = 70
 n_walk = 20
 v = 1
@@ -2763,7 +2802,7 @@ for i in range(200):
     grad_comp_list.append(grad_PBC_nc)
     sol_comp_list.append(sol_PBC_nc)
     har_comp_list.append(har_PBC_nc)
-#%% HISTOGRAMS
+#%% 
 from scipy.stats import norm, poisson
 
 trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, new_edges_rel, 1, 1)
@@ -2864,8 +2903,7 @@ ax[2].scatter(*zip(*means_h))
 ax[2].set_xlabel('Edge Lengths')
 ax[2].set_ylabel('Mean of each edge (harmonic)')
 #%%
-short_1_lsp = np.linspace(0.25, 1, num = 1000)
-short_2_lsp = np.linspace(0.3535533905932738, 1, num = 1000)
+# THEORETICAL 
 
 #finding the nodes that are inside the cluster
 inner_nodes = []
@@ -2875,44 +2913,47 @@ for node, pos in pos_PBC.items():
         inner_nodes.append(node)
     else:
         outer_nodes.append(node)
-#%%
-# THEORETICAL 
+        
+    
 Dt = 100
 n_walk = 80
 v = 1
 results_avg_pot = []
-for short_1, short_2 in zip(short_1_lsp, short_2_lsp):
-    theta = (0.25/short_1-0.25)/(1-0.25)
-    trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, new_edges_rel, short_1, short_2)
+alpha_lsp = np.linspace(0, 1, 100)
+
+for alpha in alpha_lsp:
+    trans_rate_PBC_nc = build_trans_rates_matrix(PBC_lattice.copy(), pos_PBC, v, alpha)
     PBC_th, solution_PBC, _ = solve_continuous_rw_flow(PBC_lattice.copy(), trans_rate_PBC_nc, Dt, n_walk)
+    rev_PBC_th = reverse_negative_edges(PBC_th)
     g_PBC_th, s_PBC_th, h_PBC_th, pot_PBC_th, div_PBC_th = \
-        hd.hodge_decomposition(PBC_th, 'edge_visits')
+        hd.hodge_decomposition(rev_PBC_th, 'edge_visits')
     
-    if short_1 == short_1_lsp[0]:
-        PBC_ini = PBC_th
-        g_PBC_ini = g_PBC_th
-        pot_PBC_ini = pot_PBC_th
-        div_PBC_ini = div_PBC_th
+    if alpha == alpha_lsp[0]:
+        PBC_ini = rev_PBC_th.copy()
+        g_PBC_ini = g_PBC_th.copy()
+        pot_PBC_ini = pot_PBC_th.copy()
+        div_PBC_ini = div_PBC_th.copy()
         
-    elif short_1 == short_1_lsp[-1]:
-        PBC_fin = PBC_th
-        g_PBC_fin = g_PBC_th
-        pot_PBC_fin = pot_PBC_th
-        div_PBC_fin = div_PBC_th
+    elif alpha == alpha_lsp[-1]:
+        PBC_fin = rev_PBC_th.copy()
+        g_PBC_fin = g_PBC_th.copy()
+        pot_PBC_fin = pot_PBC_th.copy()
+        div_PBC_fin = div_PBC_th.copy()
         
-    elif theta > 0.446 and theta < 0.448:
-        PBC_zero = PBC_th
-        g_PBC_zero = g_PBC_th
-        pot_PBC_zero = pot_PBC_th
-        div_PBC_zero = div_PBC_th
+    elif alpha > 0.48 and alpha < 0.483:
+        PBC_zero = rev_PBC_th.copy()
+        g_PBC_zero = g_PBC_th.copy()
+        pot_PBC_zero = pot_PBC_th.copy()
+        div_PBC_zero = div_PBC_th.copy()
     avg_inner_pot = np.mean([pot_PBC_th[in_node] for in_node in inner_nodes])
     avg_outer_pot = np.mean([pot_PBC_th[out_node] for out_node in outer_nodes])
-    results_avg_pot.append([theta, avg_outer_pot - avg_inner_pot])
+    results_avg_pot.append([alpha, avg_outer_pot - avg_inner_pot])
 #%% PLOT OF INNER-OUTER POT. DIFFERENCE
-fig,ax =plt.subplots(figsize = (8,6))
+fig,ax = plt.subplots(figsize = (8,6))
 ax.plot(*zip(*results_avg_pot), color = 'black')
 ax.set_ylabel(r'$\Delta V_{io}$', fontsize = 18)
-ax.set_xlabel(r'$\theta = \frac{d_{mod}-d_{real}}{d_{lattice}-d_{real}}$',fontsize = 18)
+ax.set_xlabel(r'$\alpha$', fontsize = 18)
+# ax.set_xlabel(r'$\theta = \frac{d_{mod}-d_{real}}{d_{lattice}-d_{real}}$',fontsize = 18)
 ax.tick_params('both', labelsize = 18)
 ax.fill_between(np.linspace(0,1,50), 0, 250, color = (5/255, 51/255, 177/255, 0.3), label = 'The centre is repulsive')
 ax.fill_between(np.linspace(0,1,50), 0, -200, color = (176/255, 5/255, 44/255, 0.3), label = 'The centre is attractive')
@@ -2922,14 +2963,40 @@ plt.ylim([-200, 250])
 ax.legend(fontsize = 15)
 plt.tight_layout()
 #%%
-print((0.25/short_1_lsp-0.25)/(1-0.25))
-
-#%%
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 import networkx as nx
 
+N = 8
+periodic_edges = []
+for i in range(N):
+    periodic_edges.append((i, i+N*N-N))
+    if i==0:
+        periodic_edges.append((i,i+N-1))
+    else:
+        periodic_edges.append((i*N, i*N+N-1))
+        
+
+for p_e in periodic_edges:
+    try:
+        g_PBC_ini.pop(p_e)
+    except:
+        g_PBC_ini.pop((p_e[1], p_e[0]))
+        
+for p_e in periodic_edges:
+    try:
+        g_PBC_zero.pop(p_e)
+    except:
+        g_PBC_zero.pop((p_e[1], p_e[0]))
+        
+for p_e in periodic_edges:
+    try:
+        g_PBC_fin.pop(p_e)
+    except:
+        g_PBC_fin.pop((p_e[1], p_e[0]))
+
+#%%
 plt.figure(figsize=(16, 14))
 gs = gridspec.GridSpec(2, 3, width_ratios=[1, 1, 1], wspace=0.2)
 ax1 = plt.subplot(gs[0])
@@ -2959,7 +3026,7 @@ nx.draw_networkx_nodes(PBC_ini, pos=pos_PBC, label=None,
                        node_size=50, node_color=color_pot, cmap=cmap_pot,
                        vmin=vmin_pot, vmax=vmax_pot, ax=ax1)
 
-nx.draw_networkx_edges(PBC_ini, pos=pos_PBC, label=None, edge_color=color_g,
+nx.draw_networkx_edges(PBC_ini, pos=pos_PBC, edgelist = g_PBC_ini.keys(), label=None, edge_color=color_g,
                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
                       arrowsize=5, node_size=50, ax=ax1)
 
@@ -2994,7 +3061,7 @@ nx.draw_networkx_nodes(PBC_zero, pos=pos_PBC, label=None,
                        node_size=50, node_color=color_pot, cmap=cmap_pot,
                        vmin=vmin_pot, vmax=vmax_pot, ax=ax2)
 
-nx.draw_networkx_edges(PBC_zero, pos=pos_PBC, label=None, edge_color=color_g,
+nx.draw_networkx_edges(PBC_zero, pos=pos_PBC, edgelist = g_PBC_zero.keys(), label=None, edge_color=color_g,
                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
                       arrowsize=5, node_size=50, ax=ax2)
 
@@ -3029,14 +3096,14 @@ nx.draw_networkx_nodes(PBC_fin, pos=pos_PBC, label=None,
                        node_size=50, node_color=color_pot, cmap=cmap_pot,
                        vmin=vmin_pot, vmax=vmax_pot, ax=ax3)
 
-nx.draw_networkx_edges(PBC_fin, pos=pos_PBC, label=None, edge_color=color_g,
+nx.draw_networkx_edges(PBC_fin, pos=pos_PBC, edgelist = g_PBC_fin.keys(), label=None, edge_color=color_g,
                       edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax,
                       arrowsize=5, node_size=50, ax=ax3)
 
 plt.subplots_adjust(right=0.75)
 
 
-
+print(g_PBC_ini.keys())
 cbar_ax1 = plt.gcf().add_axes([0.9, 0.5, 0.02, 0.4])  # Adjust the position and size as needed
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
 sm._A = []
@@ -3054,7 +3121,7 @@ cbar_ax2.tick_params(labelsize=15)
 
 ax4.plot(*zip(*results_avg_pot), color='black')
 ax4.set_ylabel(r'$\Delta V_{io}$', fontsize=18)
-ax4.set_xlabel(r'$\theta = \frac{d_{mod}-d_{real}}{d_{lattice}-d_{real}}$', fontsize=18)
+ax4.set_xlabel(r'$\alpha $', fontsize=18)
 ax4.tick_params('both', labelsize=18)
 ax4.fill_between(np.linspace(0, 1, 50), 0, 250, color=(5 / 255, 51 / 255, 177 / 255, 0.3),
                  label='The centre is repulsive')
@@ -3072,8 +3139,7 @@ plt.show()
 #sim
 plot_hodge(walked_nc_PBC, grad_PBC_nc, sol_PBC_nc, har_PBC_nc, pot_PBC_nc, 
            div_PBC_nc, pos_PBC)
-#%%
-#theo
+#%% theo
 plot_hodge(PBC_th, g_PBC_th, s_PBC_th, h_PBC_th, pot_PBC_th, div_PBC_th, 
            pos_PBC)
 
@@ -3103,18 +3169,71 @@ stat_probs = {item[0]: item[1]/len(PBC_lattice.nodes) for item in prob_evo_discr
 rev_discr_PBC_theo = reverse_negative_edges(discr_PBC_theo)
 grad_discr_th, sol_discr_th, har_discr_th, pot_discr_th, div_discr_th = \
     hd.hodge_decomposition(rev_discr_PBC_theo, 'edge_visits')
-#%% plot discr pbc
 
-plot_hodge(discr_PBC, grad_discr_sim, sol_discr_sim, har_discr_sim, 
-            dict(occ_df_discr.iloc[-1]), div_discr_sim, pos_PBC)
+N = 8
+periodic_edges = []
+for i in range(N):
+    periodic_edges.append((i, i+N*N-N))
+    if i==0:
+        periodic_edges.append((i,i+N-1))
+    else:
+        periodic_edges.append((i*N, i*N+N-1))
+        
 
-print(sum(list(stat_probs.values())))
+for p_e in periodic_edges:
+    try:
+        grad_discr_th.pop(p_e)
+    except:
+        grad_discr_th.pop((p_e[1], p_e[0]))
 
-plot_hodge(rev_discr_PBC_theo, grad_discr_th, sol_discr_th, har_discr_th, stat_probs,
-           div_discr_th, pos_PBC)
+#%% CONSTANT VELOCITY WALK
+Dt = 20
+n_walk = 120
+v = 1
 
+walked_v_ER, path_tot_cnst_v = periodic_walkers(PBC_lattice.copy(), Dt, v, pos_PBC,
+                                            n_walk, N, 0)
+
+
+occ_df = get_node_probabilities_nc(PBC_lattice, Dt, 100, path_tot_cnst_v, 
+                                         len(PBC_lattice.nodes), n_walk)
+#%%
+stat_probs = dict(occ_df.iloc[-1])
+rev_constant_v_pbc = reverse_negative_edges(walked_v_ER)
+
+grad_cnst_v, sol_cnst_v, har_cnst_v, pot_cnst_v, div_cnst_v = \
+    hd.hodge_decomposition(rev_constant_v_pbc,'edge_visits')
+#%%
+N = 8
+periodic_edges = []
+for i in range(N):
+    periodic_edges.append((i, i+N*N-N))
+    if i==0:
+        periodic_edges.append((i,i+N-1))
+    else:
+        periodic_edges.append((i*N, i*N+N-1))
+        
+
+for p_e in periodic_edges:
+    try:
+        grad_cnst_v.pop(p_e)
+    except:
+        grad_cnst_v.pop((p_e[1], p_e[0]))
+        
+
+plot_hodge(walked_v_ER, grad_cnst_v, sol_cnst_v, har_cnst_v, stat_probs, 
+           div_cnst_v, pos_PBC)
+#%% COMPARISON STEADY STATE PROBABILITIES CTRW DISCRETE
+
+plt.figure(figsize = (8, 6))
+plt.xlabel('DTRW stat. probability', fontsize = 18)
+plt.ylabel('CTRW stat. probability', fontsize = 18)
+plt.xticks(size = 16)
+plt.yticks(size = 16)
+plt.scatter(stat_probs.values(), stat_probs_nc.values(), s = 20)
+plt.tight_layout()
 #%% constant velocity RW
-Dt = 70
+Dt = 100
 n_walk = 100
 v = 1
 constant_v_pbc, paths_cnst_v_pbc = periodic_walkers(PBC_lattice.copy(), Dt, v, 
@@ -3131,8 +3250,27 @@ occ_df_nc_pbc = get_node_probabilities_nc(PBC_lattice, Dt, 200, paths_cnst_v_pbc
 g_PBC_cont, s_PBC_cont, h_PBC_cont, pot_PBC_cont, div_PBC_cont =\
 hd.hodge_decomposition(rev_constant_v_pbc, 'edge_visits')
 #%%
-stat_probs_cnst_v = dict(occ_df_nc_pbc.iloc[-1])
-plot_hodge(rev_constant_v_pbc, g_PBC_cont, s_PBC_cont, h_PBC_cont, stat_probs_cnst_v, 
+# stat_probs_cnst_v = dict(occ_df_nc_pbc.iloc[-1])
+g_PBC_cont, s_PBC_cont, h_PBC_cont, pot_PBC_cont, div_PBC_cont =\
+hd.hodge_decomposition(rev_constant_v_pbc, 'edge_visits')
+
+N = 8
+periodic_edges = []
+for i in range(N):
+    periodic_edges.append((i, i+N*N-N))
+    if i==0:
+        periodic_edges.append((i,i+N-1))
+    else:
+        periodic_edges.append((i*N, i*N+N-1))
+        
+
+for p_e in periodic_edges:
+    try:
+        g_PBC_cont.pop(p_e)
+    except:
+        g_PBC_cont.pop((p_e[1], p_e[0]))
+        
+plot_hodge(rev_constant_v_pbc, g_PBC_cont, s_PBC_cont, h_PBC_cont, pot_PBC_cont, 
            div_PBC_cont, pos_PBC)
 #%% edge centric
 Dt = 70
@@ -3267,78 +3405,4 @@ plt.legend(custom_lines, ['cnst. v', 'edge-centric', 'predicted stationary edge 
 plt.tight_layout()
 
 print(np.sum(occ_df_nc_pbc.iloc[-1]))
-#%% correlations between dynamics: PBC LATTICE
-#edge centric
-plot_pot_corr(pot_adj_PBC, pot_sim_adj_PBC, 'Potential Adjoint Model', 
-              'Potential constant velocity')
-plot_grad_corr(grad_adj_PBC, grad_sim_adj_PBC, 'Grad. comp. Adjoint Model', 
-              'Grad. comp. constant velocity')
-#%%
-#node centric
-plot_pot_corr(pot_PBC_th, pot_PBC_cont,'Potential Node Centric', 
-              'Potential constant velocity')
-
-plot_grad_corr(g_PBC_th, g_PBC_cont,'Grad. comp. Node Centric', 
-              'Grad. comp. constant velocity')
-
-#%% Test distance vs degree: LOW DEGREE HIGH CLUSTERING
-
-node_numb = 40
-np.random.seed(1000)
-clust_1 = np.random.normal(3.5, 0.2, size=(node_numb, 2))
-
-#NxN lattice ----
-N = 8
-clust_lattice = nx.grid_2d_graph(N,N,periodic=True)
-
-pos_lat = {i: j for i,j in enumerate(clust_lattice.nodes)}
-#labels = dict( ((i, j), i * N + j) for i, j in PBC_lattice.nodes() )
-labels = {i: k for k, i in enumerate(clust_lattice.nodes)}
-nx.relabel_nodes(clust_lattice, labels, copy=False)
-
-clust_lattice = nx.DiGraph(clust_lattice)
-out_edges = [edge for edge in clust_lattice.edges if edge[0]
-    > edge[1]]  # removing all outward edges
-clust_lattice.remove_edges_from(out_edges)
-
-nx.set_node_attributes(clust_lattice, pos_lat, name='pos')
-# ---
-# x,y coords of points
-
-tri = Delaunay(clust_1)
-# plt.figure()
-# plt.triplot(clust_1[:, 0], clust_1[:, 1], tri.simplices)
-# plt.legend()
-# plt.show()
-
-# create a set for edges that are indexes of the points
-edges = set()
-# for each Delaunay triangle
-for n in range(tri.nsimplex):
-    # for each edge of the triangle
-    # sort the vertices
-    # (sorting avoids duplicated edges being added to the set)
-    # and add to the edges set
-    edge = sorted([tri.vertices[n, 0], tri.vertices[n, 1]])
-    edges.add((edge[0], edge[1]))
-    edge = sorted([tri.vertices[n, 0], tri.vertices[n, 2]])
-    edges.add((edge[0], edge[1]))
-    edge = sorted([tri.vertices[n, 1], tri.vertices[n, 2]])
-    edges.add((edge[0], edge[1]))
-
-
-# make a graph based on the Delaunay triangulation edges
-graph = nx.DiGraph(list(edges))
-# plt.figure()
-# plot graph
-# dictionary of node:position
-pointIDXY = dict(zip(range(len(clust_1)), clust_1))
-nx.set_node_attributes(graph, pointIDXY, name='pos')
-
-clust_lattice = nx.disjoint_union(clust_lattice, graph)
-
-clust_lattice.add_edges_from([(28, 102), (28, 96), (27, 65), (27, 75), (36, 74), 
-                              (36, 91), (35, 67), (35, 71)])
-pos_lat = nx.get_node_attributes(clust_lattice, 'pos')
-nx.draw_networkx(clust_lattice, pos = pos_lat)
 

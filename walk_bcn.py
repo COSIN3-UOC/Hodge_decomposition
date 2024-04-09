@@ -1059,7 +1059,7 @@ def discrete_rw_edge_flow(G, trans_matrix, steps, n_walk):
     # prob_node = {iarr_to_inode[i]: prob for i, prob in enumerate(probs)}
     return(G, prob_evo)
 
-#%% CONTINUUM NEWMANN WITHOUT ABSORBINGS
+#%% CTRW
 
 '''first we build the transition rates matrix'''
 

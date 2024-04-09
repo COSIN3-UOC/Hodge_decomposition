@@ -1,0 +1,12 @@
+denver;26954
+barcelona;25831
+paris;2154
+bogota;3116
+dc;3559
+nyc;32118
+LA;2229
+buenosaires;5348
+boston;26986
+brussels;31370
+madrid;3042
+montreal;32188
