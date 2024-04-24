@@ -189,8 +189,8 @@ crs = "EPSG:2154"
 
 'BCN'
 
-# path_edges = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
-# p_nodes = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/nodes_clean_net_willum.shp'
+# path_edges = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/data/barcelona/edges_clean_net_willum.shp'
+# p_nodes = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/data/barcelona/nodes_clean_net_willum.shp'
 # crs = "EPSG:25831"
 # folder = 'bcn'
 
