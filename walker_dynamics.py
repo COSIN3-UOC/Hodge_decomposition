@@ -34,6 +34,28 @@ to the nodes
 
 
 def digraph_walkers(G, steps, n_walk):
+    '''
+    moves "n_walk" walkers/node in a directed graph "G" "steps" times. The initial positions of the
+    walkers are randomly selected amongst the nodes. The function returns the graph
+    with the amount of times any walker has passed through each node as attributes
+    to the nodes
+
+
+    Parameters
+    ----------
+    G : nx.DiGraph
+        Input graph to walk on.
+    steps : Int
+        Max steps to perform.
+    n_walk : Int
+        number of realisations of the random walk during steps max time.
+
+    Returns
+    -------
+    G: nx.DiGraph with the edge flows in an attribute called 'edge_visits'.
+    
+    occupation_t: list with the walker position at each step
+    '''
 
     # overall_node_weights = {node: 0 for node in list(G.nodes)}
     #total occupation of each node at each time step
@@ -107,74 +129,9 @@ def digraph_walkers(G, steps, n_walk):
     # nx.set_node_attributes(G, overall_node_weights, name='weights')
     nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
     return(G, path_tot)
-# %% ABSORBING RANDOM WALK ON A DIRECTED GRAPH (walk during amount of steps)
-'''
-moves walkers in a directed graph "G" "steps" times. The initial positions of the
-walkers are randomly selected amongst the nodes. The function returns the graph
-with the amount of times any walker has passed through each node as attributes
-to the nodes. The absorbing node is every node of the graoh once such that all 
-the source-target pairs are considered.
 
-'''
+# CONSTANT VELOCITY RW
 
-
-def absorbing_walkers(G, n_walk):
-
-    # let's add a list of n_walk random walkers
-    # overall_node_weights = {node: 0 for node in list(G.nodes)}
-    overall_edge_weights = {edge: 0 for edge in list(G.edges)}
-    total_nodes = len(list(G.nodes))
-#    target is the absorbing node
-    for target in sorted(list(G.nodes)):
-        print('target '+str(target)+'/'+str(total_nodes-1))
-        for w in range(n_walk):
-    #        taking the initial nodes such that target>source to avoud repetitions
-            initial_nodes = [node for node in G.nodes if node<target]
-            # initial_nodes += initial_nodes
-            # path stores the position of each walker in each time step
-            #path.append(initial_nodes)
-            # weights counts the amount of times a walker has visited each node
-            #weights = {i_node: path[0].count(i_node) for i_node in list(G.nodes)}
-            edge_weights = {i_edge: 0 for i_edge in G.edges}
-            # now, let's move the walker to a connected node
-            # first let's see the available nodes to go to
-            while len(initial_nodes)!=0:
-                # list of neighboring nodes (successors) of each walker
-                neighbors = [[n for n in (list(G.neighbors(walker)) +
-                                          list(G.predecessors(walker)))]
-                             for walker in initial_nodes]
-                # now move the random walker to another node
-                final_nodes = [random.choice(goto_nodes)
-                                             for goto_nodes in neighbors]
-    
-                #path.append(final_nodes)
-    
-                # counting edge visits according to direction of edge
-                for node_i, node_f in zip(initial_nodes, final_nodes):
-                    if node_i != node_f:
-                        if (node_i, node_f) in list(G.edges):
-                            edge_weights[(node_i, node_f)] += 1
-                        else:
-                            edge_weights[(node_f, node_i)] -= 1
-                # count the occutpation of each node after the moves
-                # for node_i, node_f in zip(initial_nodes, final_nodes):
-                #     if node_i != node_f:
-                #         weights[node_i] += 1
-    #           checking if the walkers reached the target
-                if target in final_nodes:
-                    final_nodes.remove(target)
-                initial_nodes = final_nodes
-            for edge in G.edges:
-                overall_edge_weights[edge] += edge_weights[edge]/n_walk
-        # for node in G.nodes:
-        #     overall_node_weights[node] += weights[node]
-        # set node value as the number of visits of each value
-        # print(weights)
-    # nx.set_node_attributes(G, overall_node_weights, name='weights')
-    nx.set_edge_attributes(G, overall_edge_weights, name='edge_visits')
-    return(G)
-
-# %% OPTIMIZED NODE_WALKERS
 def node_walkers(G, Dt, v, pos, n_walk):
     '''
     Function that puts n = len(list(G.nodes)) random walkers in a Digraph

@@ -593,40 +593,40 @@ def distr_to_nx(distr_ind:int, path_edges: str, path_distr: str, edge_attr
         #                                       bcn_nodes.loc[i,'geometry'].y) 
         #               for i in range(len(bcn_nodes))}
     
-        # for i, j in zip(bcn_edges['i'], bcn_edges['j']):
-            
-        #     distr.add_edge(int(i), int(j), length =\
-        #                     np.linalg.norm(np.array(ind_to_pos[int(i)]) - 
-        #                                   np.array(ind_to_pos[int(j)])))
-
-                
-        for e in bcn_edges['to_from']:
-            if e == None:
-                continue
-            ind = ''
-            i = ''
-            for a in e:
-                
-                if a.isdigit():
-                    ind += a
-                if a == ',':
-                    i = int(ind)
-                    ind = ''
-            j = int(ind)
-            
-            # print(i, j)
-            
-            if i == '' or j == '' or i == j: #sometimes edges only have 1 node or are self-edges
-                continue
-            
-            if i not in distr.nodes or j not in distr.nodes:
-                continue
+        for i, j in zip(bcn_edges['i'], bcn_edges['j']):
             
             distr.add_edge(int(i), int(j), length =\
                             np.linalg.norm(np.array(ind_to_pos[int(i)]) - 
                                           np.array(ind_to_pos[int(j)])))
 
-            i = j = ''
+                
+        # for e in bcn_edges['to_from']:
+        #     if e == None:
+        #         continue
+        #     ind = ''
+        #     i = ''
+        #     for a in e:
+                
+        #         if a.isdigit():
+        #             ind += a
+        #         if a == ',':
+        #             i = int(ind)
+        #             ind = ''
+        #     j = int(ind)
+            
+        #     # print(i, j)
+            
+        #     if i == '' or j == '' or i == j: #sometimes edges only have 1 node or are self-edges
+        #         continue
+            
+        #     if i not in distr.nodes or j not in distr.nodes:
+        #         continue
+            
+        #     distr.add_edge(int(i), int(j), length =\
+        #                     np.linalg.norm(np.array(ind_to_pos[int(i)]) - 
+        #                                   np.array(ind_to_pos[int(j)])))
+
+        #     i = j = ''
             
         
     else: # get the graph of a given district
@@ -668,7 +668,6 @@ def distr_to_nx(distr_ind:int, path_edges: str, path_distr: str, edge_attr
             nx.set_edge_attributes(distr, new_attr, name = name)
             
     
-    print(list(nx.selfloop_edges(distr)))
     print('checking for disconnected components...')
     remove_nodes = list(nx.connected_components(distr.to_undirected()))
     
@@ -1254,35 +1253,35 @@ def hodge_decomposition(G, attr_name):
 #     bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr)
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     
-    'BOSTON'
+#     'BOSTON'
     
-    distr_ind = 0
-    path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/data/boston/shp/edges/edges.shp'
-    path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
-    path_nodes = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/data/boston/shp/nodes/nodes.shp'
+#     distr_ind = 0
+#     path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/data/boston/shp/edges/edges.shp'
+#     path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+#     path_nodes = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/data/boston/shp/nodes/nodes.shp'
     
-    bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr, path_nodes = path_nodes)
+#     bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr, path_nodes = path_nodes)
 
-    print('starting walk')
-    v = 1.42
-    Dt = 15*60
-    n_walk = 20
+#     print('starting walk')
+#     v = 1.42
+#     Dt = 15*60
+#     n_walk = 20
     
-    #THEO
-    trans_rates_bcn = build_trans_rates_matrix(bcn_graph, ind_to_pos, v)
+#     #THEO
+#     trans_rates_bcn = build_trans_rates_matrix(bcn_graph, ind_to_pos, v)
     
-    print('transition rates defined. Solving diff eqs...')
+#     print('transition rates defined. Solving diff eqs...')
     
-    walk_bcn, _ = solve_continuous_rw_flow(bcn_graph.copy(), trans_rates_bcn,
-                                            Dt, n_walk)
+#     walk_bcn, _ = solve_continuous_rw_flow(bcn_graph.copy(), trans_rates_bcn,
+#                                             Dt, n_walk)
 
-    with open('/Users/robertbenassai/Documents/UOC/project_HHD/hodge_decomposition_lib/hodge_dec/tests/decompositions/boston/tot.csv', 'w') as tot_f:
-        writer = csv.writer(tot_f)
-        e_flow = nx.get_edge_attributes(walk_bcn, 'edge_visits')
-        for edge, w in e_flow.items():
-            writer.writerow([edge[0], edge[1], w])
+#     with open('/Users/robertbenassai/Documents/UOC/project_HHD/hodge_decomposition_lib/hodge_dec/tests/decompositions/boston/tot.csv', 'w') as tot_f:
+#         writer = csv.writer(tot_f)
+#         e_flow = nx.get_edge_attributes(walk_bcn, 'edge_visits')
+#         for edge, w in e_flow.items():
+#             writer.writerow([edge[0], edge[1], w])
                 
     # print('walk finished. Adjusting link direction to flow...')
     
@@ -1362,14 +1361,14 @@ if __name__ == '__main__':
 
 ##%% BARCELONA
 
-# 'ALL THE CITY'
+'ALL THE CITY'
 
-# distr_ind = 0
-# path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
-# path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
-# p_nodes = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/nodes_clean_net_willum.shp'
+distr_ind = 0
+path_bcn = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/edges_clean_net_willum.shp'
+path_distr = '/Users/robertbenassai/Documents/UOC/project_HHD/BCN_UNITATS_ADM/0301040100_Districtes_UNITATS_ADM.shp'
+p_nodes = '/Users/robertbenassai/Documents/UOC/project_HHD/xarxaneta/nodes_clean_net_willum.shp'
 
-# bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr, path_nodes = p_nodes)
+bcn_graph, ind_to_pos = distr_to_nx(distr_ind, path_bcn, path_distr, path_nodes = p_nodes)
 
 # tot_flow_dict = {}
 # #%%
